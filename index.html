@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Valcude Stats</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">🏀 <span>Valcude</span> Stats</div>
+  <div class="nav-links">
+    <a href="index.html" class="active">Dashboard</a>
+    <a href="match.html">Partidos</a>
+    <a href="player.html">Jugadoras</a>
+  </div>
+  <div class="nav-spacer"></div>
+  <a id="nav-import" href="import.html" class="btn btn-primary" style="display:none">+ Importar</a>
+</nav>
+
+<div class="page">
+  <div class="page-header">
+    <h1>Dashboard</h1>
+    <p id="subtitle">Cargando datos…</p>
+  </div>
+
+  <!-- Filtros -->
+  <div class="filters">
+    <select id="competitionFilter"><option value="">Todas las competiciones</option></select>
+    <select id="teamFilter">
+      <option value="valcude">Solo Valcude</option>
+      <option value="">Todos los equipos</option>
+    </select>
+  </div>
+
+  <!-- Tarjetas de resumen -->
+  <div class="stat-grid" id="statCards">
+    <div class="stat-card"><div class="label">Partidos</div><div class="value" id="c-games">—</div></div>
+    <div class="stat-card"><div class="label">Victorias</div><div class="value result-win" id="c-wins">—</div><div class="sub" id="c-record"></div></div>
+    <div class="stat-card"><div class="label">Pts/partido (media)</div><div class="value" id="c-ppg">—</div></div>
+    <div class="stat-card"><div class="label">Val/partido (media)</div><div class="value" id="c-vpg">—</div></div>
+  </div>
+
+  <div class="two-col">
+    <!-- Leaderboard -->
+    <div class="panel">
+      <div class="panel-header">
+        <h2>Ranking de jugadoras</h2>
+        <div class="tabs" id="leaderTabs">
+          <button class="tab active" data-stat="avg_pts">Puntos</button>
+          <button class="tab" data-stat="avg_reb">Rebotes</button>
+          <button class="tab" data-stat="avg_ast">Asistencias</button>
+          <button class="tab" data-stat="avg_val">Valoración</button>
+          <button class="tab" data-stat="avg_stl">Recuperaciones</button>
+          <button class="tab" data-stat="per40_pts">Pts/40min</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Jugadora</th>
+              <th>Equipo</th>
+              <th class="num">PJ</th>
+              <th class="num" id="th-main">PTS</th>
+              <th class="num">MIN</th>
+              <th class="num">Por min</th>
+              <th class="num">Por 40'</th>
+            </tr>
+          </thead>
+          <tbody id="leaderBody">
+            <tr><td colspan="8" class="loading"><div class="spinner"></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Lista de partidos -->
+    <div class="panel">
+      <div class="panel-header"><h2>Partidos</h2></div>
+      <div id="matchList"><div class="loading"><div class="spinner"></div></div></div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { getMatches, getLeaderboard, getCompetitions, getTeams } from './js/db.js'
+import { updateNavAuth } from './js/auth.js'
+import { fmt, fmtPct, titleCase, shortName, resultClass } from './js/utils.js'
+import { HOME_TEAM } from './js/config.js'
+
+updateNavAuth()
+
+let allMatches = []
+let leaderboard = []
+let currentStat = 'avg_pts'
+let competitionFilter = ''
+let showAllTeams = false
+
+const STAT_LABELS = {
+  avg_pts: 'PTS', avg_reb: 'REB', avg_ast: 'AST',
+  avg_val: 'VAL', avg_stl: 'REC', per40_pts: 'Pts/40',
+}
+const PER_MIN_KEY = {
+  avg_pts: 'per40_pts', avg_reb: 'per40_reb',
+  avg_ast: 'per40_ast', avg_val: 'per40_val',
+  avg_stl: null, per40_pts: null,
+}
+
+async function init() {
+  const [competitions, matches, leaders] = await Promise.all([
+    getCompetitions(),
+    getMatches(),
+    getLeaderboard(),
+  ])
+
+  allMatches = matches
+  leaderboard = leaders
+
+  // Poblar selector de competición
+  const sel = document.getElementById('competitionFilter')
+  for (const c of competitions) {
+    const opt = document.createElement('option')
+    opt.value = c.id
+    opt.textContent = `${c.name} ${c.season}`
+    sel.appendChild(opt)
+  }
+
+  render()
+}
+
+function getValcudeTeamId() {
+  // Busca el equipo principal en los datos cargados
+  const team = leaderboard.find(p =>
+    p.player?.team?.name?.includes('VALCUDE')
+  )?.player?.team
+  return team?.id || null
+}
+
+function filteredMatches() {
+  return allMatches.filter(m => {
+    if (competitionFilter && m.competition?.id != competitionFilter) return false
+    return true
+  })
+}
+
+function filteredLeaderboard() {
+  let rows = leaderboard
+  if (!showAllTeams) rows = rows.filter(p => p.player?.team?.name?.includes('VALCUDE'))
+  return rows
+}
+
+function render() {
+  const matches = filteredMatches()
+  const leaders = filteredLeaderboard()
+
+  // Calcular stats de Valcude
+  const valcudeMatches = matches.filter(m =>
+    m.team1?.name?.includes('VALCUDE') || m.team2?.name?.includes('VALCUDE')
+  )
+  let wins = 0, totalPts = 0, totalVal = 0
+  for (const m of valcudeMatches) {
+    const isTeam1 = m.team1?.name?.includes('VALCUDE')
+    const myScore = isTeam1 ? m.team1_score : m.team2_score
+    const theirScore = isTeam1 ? m.team2_score : m.team1_score
+    if (myScore > theirScore) wins++
+    totalPts += myScore || 0
+  }
+
+  const valcudePlayers = leaderboard.filter(p => p.player?.team?.name?.includes('VALCUDE'))
+  for (const p of valcudePlayers) totalVal += p.avg_val || 0
+
+  document.getElementById('subtitle').textContent =
+    `${valcudeMatches.length} partidos · ${matches[0]?.competition?.name || ''} ${matches[0]?.competition?.season || ''}`
+  document.getElementById('c-games').textContent = valcudeMatches.length
+  document.getElementById('c-wins').textContent = wins
+  document.getElementById('c-record').textContent = `${wins}V – ${valcudeMatches.length - wins}D`
+  document.getElementById('c-ppg').textContent = valcudeMatches.length
+    ? fmt(totalPts / valcudeMatches.length, 1)
+    : '—'
+  document.getElementById('c-vpg').textContent = valcudePlayers.length
+    ? fmt(totalVal / valcudePlayers.length, 1)
+    : '—'
+
+  renderLeader(leaders)
+  renderMatches(matches)
+}
+
+function renderLeader(leaders) {
+  document.getElementById('th-main').textContent = STAT_LABELS[currentStat]
+  const sorted = [...leaders].sort((a, b) => (b[currentStat] || 0) - (a[currentStat] || 0))
+  const per40Key = PER_MIN_KEY[currentStat]
+
+  const rows = sorted.map((p, i) => {
+    const val = p[currentStat]
+    const perMin = p.avg_min > 0 ? val / p.avg_min : null
+    const p40 = per40Key ? (p[per40Key] ?? null) : (p.avg_min > 0 ? (val / p.avg_min) * 40 : null)
+    return `<tr>
+      <td class="rank">${i + 1}</td>
+      <td class="player-name"><a href="player.html?id=${p.player.id}">${titleCase(p.player.name)}</a></td>
+      <td class="team-name">${titleCase(p.player.team?.name || '')}</td>
+      <td class="num">${p.games}</td>
+      <td class="num"><strong>${fmt(val, 1)}</strong></td>
+      <td class="num">${fmt(p.avg_min, 1)}'</td>
+      <td class="num">${perMin != null ? fmt(perMin, 2) : '—'}</td>
+      <td class="num">${p40 != null ? fmt(p40, 1) : '—'}</td>
+    </tr>`
+  }).join('')
+
+  document.getElementById('leaderBody').innerHTML = rows || '<tr><td colspan="8" class="empty">Sin datos</td></tr>'
+}
+
+function renderMatches(matches) {
+  const html = matches.map(m => {
+    const isValcude1 = m.team1?.name?.includes('VALCUDE')
+    const myScore = isValcude1 ? m.team1_score : m.team2_score
+    const theirScore = isValcude1 ? m.team2_score : m.team1_score
+    const rival = isValcude1 ? m.team2?.name : m.team1?.name
+    const won = myScore > theirScore
+    const cls = won ? 'result-win' : 'result-loss'
+    return `<a class="match-item" href="match.html?id=${m.id}">
+      <span class="match-jornada">J${m.jornada || '?'}</span>
+      <span class="match-teams">
+        <strong>Valcude</strong>
+        <span class="rival"> vs ${titleCase(rival || '')}</span>
+      </span>
+      <span class="match-score ${cls}">${myScore ?? '?'}–${theirScore ?? '?'}</span>
+    </a>`
+  }).join('')
+
+  document.getElementById('matchList').innerHTML = html || '<div class="empty">Sin partidos</div>'
+}
+
+// Tabs de stat
+document.getElementById('leaderTabs').addEventListener('click', e => {
+  const btn = e.target.closest('.tab')
+  if (!btn) return
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
+  btn.classList.add('active')
+  currentStat = btn.dataset.stat
+  renderLeader(filteredLeaderboard())
+})
+
+// Filtro de competición
+document.getElementById('competitionFilter').addEventListener('change', e => {
+  competitionFilter = e.target.value
+  render()
+})
+
+// Filtro de equipo
+document.getElementById('teamFilter').addEventListener('change', e => {
+  showAllTeams = e.target.value === ''
+  render()
+})
+
+init().catch(err => console.error(err))
+</script>
+</body>
+</html>

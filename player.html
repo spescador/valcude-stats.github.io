@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jugadora — Valcude Stats</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">🏀 <span>Valcude</span> Stats</div>
+  <div class="nav-links">
+    <a href="index.html">Dashboard</a>
+    <a href="match.html">Partidos</a>
+    <a href="player.html" class="active">Jugadoras</a>
+  </div>
+  <div class="nav-spacer"></div>
+  <a id="nav-import" href="import.html" class="btn btn-primary" style="display:none">+ Importar</a>
+</nav>
+
+<div class="page">
+  <div id="content"><div class="loading"><div class="spinner"></div></div></div>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+
+<script type="module">
+import { getPlayers, getPlayerFull } from './js/db.js'
+import { updateNavAuth } from './js/auth.js'
+import { fmt, fmtPct, titleCase, formatMinutes, aggregateStats, per40 } from './js/utils.js'
+
+updateNavAuth()
+
+const params = new URLSearchParams(location.search)
+const playerId = params.get('id')
+
+async function init() {
+  const content = document.getElementById('content')
+
+  if (!playerId) {
+    // Lista de jugadoras
+    const players = await getPlayers()
+    // Agrupar por equipo
+    const byTeam = {}
+    for (const p of players) {
+      const tname = p.team?.name || 'Sin equipo'
+      if (!byTeam[tname]) byTeam[tname] = []
+      byTeam[tname].push(p)
+    }
+    content.innerHTML = `
+      <div class="page-header"><h1>Jugadoras</h1><p>${players.length} jugadoras registradas</p></div>
+      ${Object.entries(byTeam).sort(([a],[b]) => a.localeCompare(b)).map(([team, ps]) => `
+        <div class="panel" style="margin-bottom:1rem">
+          <div class="panel-header"><h2>${titleCase(team)}</h2></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Jugadora</th></tr></thead>
+              <tbody>
+                ${ps.map(p => `<tr><td><a href="player.html?id=${p.id}">${titleCase(p.name)}</a></td></tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>`).join('')}
+    `
+    return
+  }
+
+  // Perfil de jugadora
+  const { player, stats } = await getPlayerFull(playerId)
+  const agg = aggregateStats(stats)
+
+  if (!agg) {
+    content.innerHTML = '<div class="empty">Sin datos para esta jugadora</div>'
+    return
+  }
+
+  // Última dorsal usada
+  const lastJersey = stats[stats.length - 1]?.jersey_number || '—'
+
+  content.innerHTML = `
+    <div class="page-header"><p><a href="player.html">← Todas las jugadoras</a></p></div>
+
+    <div class="player-header">
+      <div class="player-number">#${lastJersey}</div>
+      <div class="player-info">
+        <h1>${titleCase(player.name)}</h1>
+        <div class="team">${titleCase(player.team?.name || '')}</div>
+        <div style="margin-top:.5rem;color:var(--text2);font-size:.85rem">${agg.games} partidos jugados</div>
+      </div>
+    </div>
+
+    <!-- Medias -->
+    <div class="player-avg-grid">
+      ${avgCard('PTS', fmt(agg.avg_pts,1), fmt(agg.per40_pts,1)+'/40')}
+      ${avgCard('REB', fmt(agg.avg_reb,1), fmt(agg.per40_reb,1)+'/40')}
+      ${avgCard('AST', fmt(agg.avg_ast,1), fmt(agg.per40_ast,1)+'/40')}
+      ${avgCard('VAL', fmt(agg.avg_val,1), fmt(agg.per40_val,1)+'/40')}
+      ${avgCard('MIN', fmt(agg.avg_min,1)+"'", '')}
+      ${avgCard('+/-', (agg.avg_pm > 0 ? '+' : '') + fmt(agg.avg_pm,1), '')}
+    </div>
+
+    <!-- Porcentajes de tiro -->
+    <div class="panel" style="margin-bottom:1.5rem">
+      <div class="panel-header"><h2>Porcentajes de tiro</h2></div>
+      <div class="panel-body">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;text-align:center">
+          ${shootingCard('TC2', agg.fg2_made, agg.fg2_attempted, agg.fg2_pct)}
+          ${shootingCard('TC3', agg.fg3_made, agg.fg3_attempted, agg.fg3_pct)}
+          ${shootingCard('TL', agg.ft_made, agg.ft_attempted, agg.ft_pct)}
+        </div>
+      </div>
+    </div>
+
+    <!-- Gráfico de evolución -->
+    <div class="panel" style="margin-bottom:1.5rem">
+      <div class="panel-header">
+        <h2>Evolución por partido</h2>
+        <div class="tabs" id="chartTabs">
+          <button class="tab active" data-key="points">PTS</button>
+          <button class="tab" data-key="valuation">VAL</button>
+          <button class="tab" data-key="reb_total">REB</button>
+          <button class="tab" data-key="assists">AST</button>
+          <button class="tab" data-key="minutes">MIN</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="chart-container"><canvas id="evChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Game log -->
+    <div class="panel">
+      <div class="panel-header"><h2>Partido a partido</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>J</th><th>Rival</th><th>Res.</th>
+              <th class="num">MIN</th><th class="num">PTS</th>
+              <th class="num">TC2</th><th class="num">TC3</th><th class="num">TL</th>
+              <th class="num">REB</th><th class="num">AST</th><th class="num">REC</th>
+              <th class="num">PER</th><th class="num">VAL</th>
+              <th class="num" title="Puntos proyectados a 40min">Pts/40'</th>
+              <th class="num" title="Valoración proyectada a 40min">Val/40'</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${stats.map(s => {
+              const m = s.match
+              const isV1 = m?.team1?.name?.includes('VALCUDE')
+              const myScore = isV1 ? m?.team1_score : m?.team2_score
+              const theirScore = isV1 ? m?.team2_score : m?.team1_score
+              const rival = isV1 ? m?.team2?.name : m?.team1?.name
+              const won = myScore > theirScore
+              const min = Number(s.minutes)
+              const hasMin = min > 1
+              return `<tr class="gamelog-row">
+                <td><a href="match.html?id=${m?.id}">${m?.jornada || '?'}</a></td>
+                <td>${titleCase(rival || '')}</td>
+                <td><span class="badge ${won ? 'badge-win' : 'badge-loss'}">${won ? 'V' : 'D'} ${myScore}-${theirScore}</span></td>
+                <td class="num">${formatMinutes(min)}</td>
+                <td class="num highlight"><strong>${s.points}</strong></td>
+                <td class="num">${s.fg2_made}/${s.fg2_attempted}</td>
+                <td class="num">${s.fg3_made}/${s.fg3_attempted}</td>
+                <td class="num">${s.ft_made}/${s.ft_attempted}</td>
+                <td class="num">${s.reb_def}+${s.reb_off}</td>
+                <td class="num">${s.assists}</td>
+                <td class="num">${s.steals}</td>
+                <td class="num">${s.turnovers}</td>
+                <td class="num">${s.valuation}</td>
+                <td class="num" style="color:var(--accent)">${hasMin ? fmt(s.points / min * 40, 1) : '—'}</td>
+                <td class="num" style="color:var(--accent)">${hasMin ? fmt(s.valuation / min * 40, 1) : '—'}</td>
+              </tr>`
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `
+
+  // Gráfico
+  let chart = buildChart(stats, 'points')
+
+  document.getElementById('chartTabs').addEventListener('click', e => {
+    const btn = e.target.closest('.tab')
+    if (!btn) return
+    document.querySelectorAll('#chartTabs .tab').forEach(t => t.classList.remove('active'))
+    btn.classList.add('active')
+    chart.destroy()
+    chart = buildChart(stats, btn.dataset.key)
+  })
+}
+
+function avgCard(label, main, sub) {
+  return `<div class="stat-card">
+    <div class="label">${label}</div>
+    <div class="value">${main}</div>
+    ${sub ? `<div class="sub" style="color:var(--accent);font-weight:600">${sub}</div>` : ''}
+  </div>`
+}
+
+function shootingCard(label, made, attempted, pct) {
+  return `<div>
+    <div style="font-size:1.5rem;font-weight:700">${pct || '—'}</div>
+    <div style="color:var(--text2);font-size:.8rem;margin-top:.2rem">${label} · ${made}/${attempted}</div>
+  </div>`
+}
+
+function buildChart(stats, key) {
+  const labels = stats.map((s, i) => `J${s.match?.jornada || i + 1}`)
+  const values = stats.map(s => Number(s[key]) || 0)
+  const avg = values.reduce((a, b) => a + b, 0) / values.length
+
+  const ctx = document.getElementById('evChart').getContext('2d')
+  return new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: key,
+          data: values,
+          backgroundColor: 'rgba(249,115,22,.7)',
+          borderRadius: 4,
+        },
+        {
+          label: 'Media',
+          data: values.map(() => avg),
+          type: 'line',
+          borderColor: 'rgba(255,255,255,.4)',
+          borderDash: [4, 4],
+          pointRadius: 0,
+          fill: false,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#8b91a8' }, grid: { color: 'rgba(255,255,255,.05)' } },
+        y: { ticks: { color: '#8b91a8' }, grid: { color: 'rgba(255,255,255,.05)' }, beginAtZero: true },
+      },
+    },
+  })
+}
+
+init().catch(console.error)
+</script>
+</body>
+</html>

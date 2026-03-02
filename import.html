@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Importar — Valcude Stats</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">🏀 <span>Valcude</span> Stats</div>
+  <div class="nav-links">
+    <a href="index.html">Dashboard</a>
+    <a href="match.html">Partidos</a>
+    <a href="player.html">Jugadoras</a>
+  </div>
+  <div class="nav-spacer"></div>
+  <button id="btn-signout" class="btn btn-ghost" style="display:none">Cerrar sesión</button>
+</nav>
+
+<div class="page" style="max-width:720px">
+
+  <!-- LOGIN (se oculta al autenticarse) -->
+  <div id="loginSection">
+    <div class="auth-wrap">
+      <h2>Acceso de administrador</h2>
+      <div id="loginError" class="error-msg" style="display:none"></div>
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="inputEmail" placeholder="tu@email.com" autocomplete="username">
+      </div>
+      <div class="field">
+        <label>Contraseña</label>
+        <input type="password" id="inputPass" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button class="btn btn-primary" id="btnLogin" style="width:100%;justify-content:center">
+        Iniciar sesión
+      </button>
+    </div>
+  </div>
+
+  <!-- IMPORTADOR (visible solo si autenticado) -->
+  <div id="importSection" style="display:none">
+    <div class="page-header">
+      <h1>Importar estadísticas</h1>
+      <p>Arrastra uno o varios ficheros Excel (formato FBM) para importarlos.</p>
+    </div>
+
+    <!-- Zona de arrastrar -->
+    <div class="dropzone" id="dropzone">
+      <div class="icon">📂</div>
+      <p><strong>Arrastra los ficheros aquí</strong></p>
+      <p style="margin-top:.4rem">o haz clic para seleccionarlos</p>
+      <input type="file" id="fileInput" accept=".xlsx" multiple style="display:none">
+    </div>
+
+    <!-- Cola de importación -->
+    <div class="import-queue" id="importQueue"></div>
+  </div>
+
+</div>
+
+<!-- SheetJS -->
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+
+<script type="module">
+import { signIn, signOut, getSession, onAuthStateChange } from './js/auth.js'
+import { checkMatchExists, importMatch } from './js/db.js'
+import { parseWorkbook, parseFilename } from './js/parser.js'
+import { titleCase, fmt } from './js/utils.js'
+
+// ── Auth ────────────────────────────────────────────────────────
+const loginSection  = document.getElementById('loginSection')
+const importSection = document.getElementById('importSection')
+const btnSignout    = document.getElementById('btn-signout')
+const loginError    = document.getElementById('loginError')
+
+async function checkAuth() {
+  const session = await getSession()
+  setAuthUI(!!session)
+}
+
+function setAuthUI(loggedIn) {
+  loginSection.style.display  = loggedIn ? 'none'  : 'block'
+  importSection.style.display = loggedIn ? 'block' : 'none'
+  btnSignout.style.display    = loggedIn ? 'inline-flex' : 'none'
+}
+
+document.getElementById('btnLogin').addEventListener('click', async () => {
+  const email = document.getElementById('inputEmail').value.trim()
+  const pass  = document.getElementById('inputPass').value
+  loginError.style.display = 'none'
+  try {
+    await signIn(email, pass)
+    setAuthUI(true)
+  } catch (e) {
+    loginError.textContent = e.message || 'Error al iniciar sesión'
+    loginError.style.display = 'block'
+  }
+})
+
+// Login con Enter
+document.getElementById('inputPass').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('btnLogin').click()
+})
+
+btnSignout.addEventListener('click', async () => {
+  await signOut()
+  setAuthUI(false)
+})
+
+checkAuth()
+
+// ── Drag & Drop ─────────────────────────────────────────────────
+const dropzone  = document.getElementById('dropzone')
+const fileInput = document.getElementById('fileInput')
+const queue     = document.getElementById('importQueue')
+
+dropzone.addEventListener('click', () => fileInput.click())
+
+dropzone.addEventListener('dragover', e => {
+  e.preventDefault()
+  dropzone.classList.add('dragover')
+})
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'))
+dropzone.addEventListener('drop', e => {
+  e.preventDefault()
+  dropzone.classList.remove('dragover')
+  processFiles([...e.dataTransfer.files])
+})
+
+fileInput.addEventListener('change', () => {
+  processFiles([...fileInput.files])
+  fileInput.value = ''
+})
+
+// ── Procesado ────────────────────────────────────────────────────
+async function processFiles(files) {
+  for (const file of files) {
+    if (!file.name.endsWith('.xlsx')) continue
+    const item = addQueueItem(file.name)
+    try {
+      // 1. Leer con SheetJS
+      const buf = await file.arrayBuffer()
+      const wb  = XLSX.read(buf, { type: 'array' })
+
+      // 2. Parsear
+      const parsed = parseWorkbook(wb, file.name)
+
+      // 3. Verificar duplicado
+      const exists = await checkMatchExists(file.name)
+      if (exists) {
+        setItemStatus(item, 'error', `⚠️ Ya importado anteriormente`)
+        continue
+      }
+
+      // 4. Mostrar preview y esperar confirmación
+      const confirmed = await showPreview(item, parsed)
+      if (!confirmed) {
+        setItemStatus(item, 'error', 'Cancelado')
+        continue
+      }
+
+      // 5. Obtener fecha (opcional)
+      const matchDate = item.querySelector('.input-date')?.value || null
+
+      // 6. Importar
+      setItemStatus(item, 'loading', 'Importando…')
+      await importMatch(parsed, parsed.jornada, matchDate)
+      setItemStatus(item, 'ok', `✓ Importado correctamente`)
+
+    } catch (e) {
+      console.error(e)
+      setItemStatus(item, 'error', `✗ Error: ${e.message}`)
+    }
+  }
+}
+
+function addQueueItem(name) {
+  const div = document.createElement('div')
+  div.className = 'queue-item'
+  div.innerHTML = `<div class="file-name">📄 ${name}</div>
+    <div class="queue-status">Leyendo fichero…</div>`
+  queue.appendChild(div)
+  div.scrollIntoView({ behavior: 'smooth' })
+  return div
+}
+
+function setItemStatus(item, type, msg) {
+  const el = item.querySelector('.queue-status')
+  el.className = `queue-status ${type === 'ok' ? 'ok' : type === 'error' ? 'err' : ''}`
+  el.innerHTML = type === 'loading' ? `<div class="spinner" style="width:18px;height:18px;margin:0 auto"></div> ${msg}` : msg
+}
+
+/** Muestra preview de los datos parseados y devuelve una promesa que resuelve con true/false */
+function showPreview(item, parsed) {
+  return new Promise(resolve => {
+    const team1 = parsed.team1
+    const team2 = parsed.team2
+    const j = parsed.jornada || ''
+
+    item.innerHTML = `
+      <div class="file-name">📄 ${parsed.sourceFile}</div>
+      <div style="color:var(--text2);font-size:.8rem;margin-bottom:.75rem">
+        ${parsed.competition} · Temporada ${parsed.season}
+      </div>
+
+      <div class="preview-meta">
+        <div class="field">
+          <label>Jornada</label>
+          <input type="number" class="input-jornada" value="${j}" min="1" style="width:80px;background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:.4rem .6rem">
+        </div>
+        <div class="field">
+          <label>Fecha (opcional)</label>
+          <input type="date" class="input-date" style="background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:.4rem .6rem">
+        </div>
+      </div>
+
+      <div class="preview-section">
+        <h3>${titleCase(team1.name)} <small style="color:var(--text2);font-weight:400">(${team1.players.length} jugadoras · ${team1.players.reduce((s,p)=>s+p.points,0)} pts)</small></h3>
+        ${previewTable(team1.players)}
+      </div>
+      <div class="preview-section">
+        <h3>${titleCase(team2.name)} <small style="color:var(--text2);font-weight:400">(${team2.players.length} jugadoras · ${team2.players.reduce((s,p)=>s+p.points,0)} pts)</small></h3>
+        ${previewTable(team2.players)}
+      </div>
+
+      <div style="display:flex;gap:.75rem;margin-top:1.25rem">
+        <button class="btn btn-primary btn-confirm">✓ Importar</button>
+        <button class="btn btn-ghost btn-cancel">Cancelar</button>
+      </div>
+    `
+
+    item.querySelector('.btn-confirm').addEventListener('click', () => resolve(true))
+    item.querySelector('.btn-cancel').addEventListener('click', () => resolve(false))
+  })
+}
+
+function previewTable(players) {
+  if (!players.length) return '<p style="color:var(--text2);font-size:.85rem">Sin jugadoras detectadas</p>'
+  const rows = players.map(p => `<tr>
+    <td>${p.jersey_number || '—'}</td>
+    <td>${titleCase(p.name)}</td>
+    <td class="num">${fmt(p.minutes,1)}'</td>
+    <td class="num"><strong>${p.points}</strong></td>
+    <td class="num">${p.fg2_made}/${p.fg2_attempted}</td>
+    <td class="num">${p.fg3_made}/${p.fg3_attempted}</td>
+    <td class="num">${p.ft_made}/${p.ft_attempted}</td>
+    <td class="num">${p.reb_total}</td>
+    <td class="num">${p.assists}</td>
+    <td class="num">${p.valuation}</td>
+  </tr>`).join('')
+  return `<div class="table-wrap"><table>
+    <thead><tr><th>#</th><th>Nombre</th><th class="num">MIN</th><th class="num">PTS</th>
+    <th class="num">TC2</th><th class="num">TC3</th><th class="num">TL</th>
+    <th class="num">REB</th><th class="num">AST</th><th class="num">VAL</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>`
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,394 @@
+/* ── Variables ──────────────────────────────────────── */
+:root {
+  --bg:      #0f1117;
+  --card:    #1e2130;
+  --card2:   #262a3d;
+  --border:  #2e3350;
+  --text:    #e8eaf0;
+  --text2:   #8b91a8;
+  --accent:  #f97316;
+  --accent2: #fb923c;
+  --win:     #22c55e;
+  --loss:    #ef4444;
+}
+
+/* ── Reset ──────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 15px; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { color: var(--accent2); text-decoration: underline; }
+
+/* ── Nav ────────────────────────────────────────────── */
+nav {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0 1.5rem;
+  height: 56px;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.nav-logo {
+  font-weight: 700;
+  font-size: 1.05rem;
+  white-space: nowrap;
+}
+.nav-logo span { color: var(--accent); }
+.nav-links { display: flex; gap: 1rem; }
+.nav-links a {
+  color: var(--text2);
+  font-size: .9rem;
+  padding: .25rem .5rem;
+  border-radius: 6px;
+  transition: color .15s, background .15s;
+}
+.nav-links a:hover, .nav-links a.active {
+  color: var(--text);
+  background: var(--card2);
+  text-decoration: none;
+}
+.nav-spacer { flex: 1; }
+
+/* ── Buttons ────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  padding: .4rem .9rem;
+  border: none;
+  border-radius: 8px;
+  font-size: .85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity .15s;
+}
+.btn:hover { opacity: .85; text-decoration: none; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-secondary { background: var(--card2); color: var(--text); }
+
+/* ── Page layout ────────────────────────────────────── */
+.page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+}
+.page-header { margin-bottom: 1.25rem; }
+.page-header h1 { font-size: 1.6rem; margin-bottom: .25rem; }
+.page-header p { color: var(--text2); font-size: .9rem; }
+
+/* ── Filters ────────────────────────────────────────── */
+.filters {
+  display: flex;
+  gap: .75rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+.filters select {
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: .4rem .75rem;
+  border-radius: 8px;
+  font-size: .85rem;
+  cursor: pointer;
+}
+
+/* ── Stat grid ──────────────────────────────────────── */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.stat-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+}
+.stat-card .label {
+  font-size: .75rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--text2);
+  margin-bottom: .4rem;
+}
+.stat-card .value { font-size: 1.8rem; font-weight: 700; line-height: 1; }
+.stat-card .sub { font-size: .8rem; color: var(--text2); margin-top: .25rem; }
+
+/* ── Two-column layout ──────────────────────────────── */
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 1rem;
+  align-items: start;
+}
+@media (max-width: 800px) {
+  .two-col { grid-template-columns: 1fr; }
+}
+
+/* ── Panel ──────────────────────────────────────────── */
+.panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: .5rem;
+  padding: .85rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.panel-header h2 { font-size: .95rem; font-weight: 600; }
+.panel-body { padding: 1rem; }
+
+/* ── Tabs ───────────────────────────────────────────── */
+.tabs { display: flex; gap: .35rem; flex-wrap: wrap; }
+.tab {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text2);
+  padding: .25rem .65rem;
+  border-radius: 6px;
+  font-size: .78rem;
+  cursor: pointer;
+  transition: all .15s;
+}
+.tab.active, .tab:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* ── Tables ─────────────────────────────────────────── */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+thead th {
+  padding: .55rem .75rem;
+  text-align: left;
+  font-size: .72rem;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--text2);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: var(--card2); }
+td { padding: .55rem .75rem; white-space: nowrap; }
+th.num, td.num { text-align: right; }
+.highlight { color: var(--accent); }
+.rank { color: var(--text2); width: 2rem; }
+.player-name a { color: var(--text); font-weight: 500; }
+.player-name a:hover { color: var(--accent); text-decoration: none; }
+.team-name { color: var(--text2); font-size: .8rem; }
+
+/* ── Badges ─────────────────────────────────────────── */
+.badge {
+  display: inline-block;
+  padding: .15rem .5rem;
+  border-radius: 5px;
+  font-size: .75rem;
+  font-weight: 700;
+}
+.badge-win  { background: rgba(34,197,94,.15); color: var(--win); }
+.badge-loss { background: rgba(239,68,68,.15);  color: var(--loss); }
+
+/* ── Match list ─────────────────────────────────────── */
+.match-item {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  padding: .7rem 1rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  transition: background .1s;
+  text-decoration: none;
+}
+.match-item:last-child { border-bottom: none; }
+.match-item:hover { background: var(--card2); text-decoration: none; }
+.match-jornada {
+  font-size: .72rem;
+  color: var(--text2);
+  min-width: 24px;
+}
+.match-teams { flex: 1; font-size: .88rem; }
+.match-teams strong { color: var(--text); }
+.rival { color: var(--text2); }
+.match-score {
+  font-weight: 700;
+  font-size: .9rem;
+  min-width: 60px;
+  text-align: right;
+}
+.result-win  { color: var(--win); }
+.result-loss { color: var(--loss); }
+
+/* ── Player header ──────────────────────────────────── */
+.player-header {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+.player-number {
+  font-size: 3rem;
+  font-weight: 800;
+  color: var(--accent);
+  line-height: 1;
+  min-width: 80px;
+  text-align: center;
+}
+.player-info h1 { font-size: 1.5rem; }
+.player-info .team { color: var(--text2); margin-top: .2rem; }
+.player-avg-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: .75rem;
+  margin-bottom: 1.5rem;
+}
+
+/* ── Chart ──────────────────────────────────────────── */
+.chart-container { position: relative; height: 220px; }
+
+/* ── Box score ──────────────────────────────────────── */
+.box-header {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem 1rem;
+  text-align: center;
+}
+.box-team { font-size: 1.05rem; font-weight: 700; }
+.box-score {
+  font-size: 2.5rem;
+  font-weight: 800;
+  letter-spacing: .05em;
+}
+.box-score .score-sep { color: var(--text2); padding: 0 .4rem; }
+.box-meta {
+  font-size: .78rem;
+  color: var(--text2);
+  text-align: center;
+  padding: 0 1rem .75rem;
+}
+.box-totals { font-weight: 700; background: var(--card2); }
+
+/* ── Auth / Import ──────────────────────────────────── */
+.auth-wrap {
+  max-width: 360px;
+  margin: 4rem auto;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 2rem;
+}
+.auth-wrap h2 { margin-bottom: 1.25rem; font-size: 1.2rem; }
+.form-group { margin-bottom: 1rem; }
+.form-group label {
+  display: block;
+  font-size: .82rem;
+  color: var(--text2);
+  margin-bottom: .35rem;
+}
+.form-group input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: .55rem .75rem;
+  border-radius: 8px;
+  font-size: .9rem;
+}
+.form-group input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.form-error { color: var(--loss); font-size: .82rem; margin-top: .75rem; display: none; }
+
+/* ── Dropzone ───────────────────────────────────────── */
+.dropzone {
+  border: 2px dashed var(--border);
+  border-radius: 16px;
+  padding: 3rem 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+  margin-bottom: 1.5rem;
+}
+.dropzone.drag-over {
+  border-color: var(--accent);
+  background: rgba(249,115,22,.06);
+}
+.dropzone-icon { font-size: 2.5rem; margin-bottom: .75rem; }
+.dropzone-text { color: var(--text2); font-size: .9rem; }
+.dropzone-text strong { color: var(--text); }
+
+/* ── Import log ─────────────────────────────────────── */
+.import-log {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: .75rem 1rem;
+  font-size: .8rem;
+  font-family: monospace;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.log-ok   { color: var(--win); }
+.log-err  { color: var(--loss); }
+.log-info { color: var(--text2); }
+
+/* ── Spinner / Empty / Loading ──────────────────────── */
+.loading {
+  display: flex;
+  justify-content: center;
+  padding: 2.5rem;
+}
+.spinner {
+  width: 28px; height: 28px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.empty {
+  text-align: center;
+  color: var(--text2);
+  padding: 2rem;
+  font-size: .9rem;
+}
+
+/* ── Preview tables (import) ────────────────────────── */
+.preview-section { margin-bottom: 1.5rem; }
+.preview-section h3 { font-size: .9rem; margin-bottom: .5rem; color: var(--text2); }
+.preview-meta {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+.preview-meta label { font-size: .82rem; color: var(--text2); }
+.preview-meta input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: .3rem .6rem;
+  border-radius: 6px;
+  font-size: .85rem;
+  width: 80px;
+}
