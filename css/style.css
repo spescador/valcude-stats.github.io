@@ -10,7 +10,7 @@
   --accent2: #15803d;
   --win:     #15803d;
   --loss:    #dc2626;
-  --nav-bg:  #166534;
+  --nav-bg:  #16a34a;
   --nav-link: rgba(255,255,255,.75);
 }
 
@@ -218,7 +218,7 @@ td.highlight { color: var(--accent2); font-weight: 700; }
 .box-table .col-tc    { width: 58px; }
 .box-table .col-val   { width: 46px; }
 .box-table .col-pm    { width: 44px; }
-.box-table .col-ppm   { width: 62px; }
+.box-table .col-ppm   { width: 68px; }
 
 /* ── Columnas responsivas ───────────────────────────── */
 @media (max-width: 640px) {
