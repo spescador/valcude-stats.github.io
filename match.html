@@ -30,28 +30,31 @@ import { fmt, fmtPct, titleCase, formatMinutes } from './js/utils.js'
 
 updateNavAuth()
 
-const params = new URLSearchParams(location.search)
+const params  = new URLSearchParams(location.search)
 const matchId = params.get('id')
 
 async function init() {
   const content = document.getElementById('content')
 
   if (!matchId) {
-    // Mostrar lista de partidos
+    // Lista de partidos
     const matches = await getMatches()
     content.innerHTML = `
-      <div class="page-header"><h1>Partidos</h1><p>${matches.length} partidos registrados</p></div>
+      <div class="page-header">
+        <h1>Partidos</h1>
+        <p>${matches.length} partidos registrados</p>
+      </div>
       <div class="panel">
         ${matches.map(m => {
-          const isV1 = m.team1?.name?.includes('VALCUDE')
-          const myScore = isV1 ? m.team1_score : m.team2_score
+          const isV1      = m.team1?.name?.includes('VALCUDE')
+          const myScore   = isV1 ? m.team1_score : m.team2_score
           const theirScore = isV1 ? m.team2_score : m.team1_score
-          const rival = isV1 ? m.team2?.name : m.team1?.name
-          const won = myScore > theirScore
+          const rival     = isV1 ? m.team2?.name : m.team1?.name
+          const won       = myScore > theirScore
           return `<a class="match-item" href="match.html?id=${m.id}">
             <span class="match-jornada">J${m.jornada || '?'}</span>
             <span class="match-teams">
-              <strong>Valcude</strong>
+              <strong>${titleCase(isV1 ? m.team1?.name : m.team2?.name)}</strong>
               <span class="rival"> vs ${titleCase(rival || '')}</span>
             </span>
             <span class="match-score ${won ? 'result-win' : 'result-loss'}">${myScore ?? '?'}–${theirScore ?? '?'}</span>
@@ -63,14 +66,14 @@ async function init() {
 
   // Detalle de partido
   const { match: m, stats } = await getMatch(matchId)
-  const isV1 = m.team1?.name?.includes('VALCUDE')
+  const isV1       = m.team1?.name?.includes('VALCUDE')
   const team1Stats = stats.filter(s => s.team_id === m.team1.id)
   const team2Stats = stats.filter(s => s.team_id === m.team2.id)
 
   content.innerHTML = `
     <div class="page-header">
       <p><a href="match.html">← Todos los partidos</a></p>
-      <h1 style="margin-top:.5rem">Jornada ${m.jornada || '?'}</h1>
+      <h1 style="margin-top:.4rem">Jornada ${m.jornada || '?'}</h1>
       <p>${m.competition?.name || ''} · Temporada ${m.competition?.season || ''}</p>
     </div>
 
@@ -83,7 +86,9 @@ async function init() {
         </div>
         <div class="team-name right">${titleCase(m.team2.name)}</div>
       </div>
-      ${m.match_date ? `<div style="font-size:.85rem;color:var(--text2)">${new Date(m.match_date).toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})}</div>` : ''}
+      ${m.match_date
+        ? `<div style="font-size:.82rem;color:var(--text2);margin-top:.5rem">${new Date(m.match_date).toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})}</div>`
+        : ''}
     </div>
 
     ${boxScore(m.team1.name, team1Stats)}
@@ -96,65 +101,77 @@ function boxScore(teamName, stats) {
   const sorted = [...stats].sort((a, b) => b.points - a.points)
 
   const rows = sorted.map(s => {
-    const min = Number(s.minutes)
-    const hasMin = min > 1
-    return `<tr class="gamelog-row">
-      <td>${s.jersey_number || '—'}</td>
+    const min    = Number(s.minutes)
+    const hasMin = min > 0.5
+    const ppm    = hasMin ? fmt(s.points / min, 2) : '—'
+    return `<tr>
+      <td class="hide-mobile">${s.jersey_number || '—'}</td>
       <td class="player-name"><a href="player.html?id=${s.player.id}">${titleCase(s.player.name)}</a></td>
       <td class="num">${formatMinutes(min)}</td>
       <td class="num highlight"><strong>${s.points}</strong></td>
-      <td class="num">${s.fg2_made}/${s.fg2_attempted}</td>
-      <td class="num">${s.fg3_made}/${s.fg3_attempted}</td>
-      <td class="num">${s.ft_made}/${s.ft_attempted}</td>
-      <td class="num">${s.reb_def}+${s.reb_off}</td>
-      <td class="num">${s.assists}</td>
-      <td class="num">${s.steals}</td>
-      <td class="num">${s.turnovers}</td>
+      <td class="num hide-tablet">${s.fg2_made}/${s.fg2_attempted}</td>
+      <td class="num hide-tablet">${s.fg3_made}/${s.fg3_attempted}</td>
+      <td class="num hide-tablet">${s.ft_made}/${s.ft_attempted}</td>
       <td class="num">${s.valuation}</td>
       <td class="num ${s.plus_minus > 0 ? 'result-win' : s.plus_minus < 0 ? 'result-loss' : ''}">${s.plus_minus > 0 ? '+' : ''}${s.plus_minus}</td>
-      <td class="num" style="color:var(--text2);font-size:.8rem">${hasMin ? fmt(s.points / min * 40, 1) : '—'}</td>
+      <td class="num hide-mobile" style="color:var(--text2)">${ppm}</td>
     </tr>`
   }).join('')
 
   // Totales
   const tot = stats.reduce((acc, s) => {
-    for (const k of ['points','fg2_made','fg2_attempted','fg3_made','fg3_attempted','ft_made','ft_attempted','reb_def','reb_off','assists','steals','turnovers','valuation']) {
+    for (const k of ['points','fg2_made','fg2_attempted','fg3_made','fg3_attempted','ft_made','ft_attempted','valuation']) {
       acc[k] = (acc[k] || 0) + (Number(s[k]) || 0)
     }
     return acc
   }, {})
 
   return `
-    <div class="panel" style="margin-bottom:1.5rem">
+    <div class="panel" style="margin-bottom:1.25rem">
       <div class="panel-header"><h2>${titleCase(teamName)}</h2></div>
       <div class="table-wrap">
-        <table>
+        <table class="box-table">
+          <colgroup>
+            <col class="col-hash hide-mobile">
+            <col class="col-name">
+            <col class="col-min">
+            <col class="col-pts">
+            <col class="col-tc hide-tablet">
+            <col class="col-tc hide-tablet">
+            <col class="col-tc hide-tablet">
+            <col class="col-val">
+            <col class="col-pm">
+            <col class="col-ppm hide-mobile">
+          </colgroup>
           <thead>
             <tr>
-              <th>#</th><th>Jugadora</th>
-              <th class="num">MIN</th><th class="num">PTS</th>
-              <th class="num">TC2</th><th class="num">TC3</th><th class="num">TL</th>
-              <th class="num">REB</th><th class="num">AST</th>
-              <th class="num">REC</th><th class="num">PER</th>
-              <th class="num">VAL</th><th class="num">+/-</th>
-              <th class="num" title="Puntos proyectados a 40 min">Pts/40'</th>
+              <th class="hide-mobile">#</th>
+              <th>Jugadora</th>
+              <th class="num">MIN</th>
+              <th class="num">PTS</th>
+              <th class="num hide-tablet">TC2</th>
+              <th class="num hide-tablet">TC3</th>
+              <th class="num hide-tablet">TL</th>
+              <th class="num">VAL</th>
+              <th class="num">+/-</th>
+              <th class="num hide-mobile" title="Puntos por minuto">Pts/min</th>
             </tr>
           </thead>
           <tbody>
             ${rows}
-            <tr style="border-top:2px solid var(--border);font-weight:700">
-              <td colspan="2" style="color:var(--text2)">TOTALES</td>
+            <tr style="border-top:2px solid var(--border);font-weight:700;background:var(--card2)">
+              <td class="hide-mobile" colspan="1" style="color:var(--text2);font-size:.78rem">TOT</td>
+              <td style="color:var(--text2);font-size:.8rem">TOTALES</td>
               <td></td>
               <td class="num">${tot.points}</td>
-              <td class="num">${tot.fg2_made}/${tot.fg2_attempted} <small style="color:var(--text2)">${fmtPct(tot.fg2_made,tot.fg2_attempted)}</small></td>
-              <td class="num">${tot.fg3_made}/${tot.fg3_attempted} <small style="color:var(--text2)">${fmtPct(tot.fg3_made,tot.fg3_attempted)}</small></td>
-              <td class="num">${tot.ft_made}/${tot.ft_attempted} <small style="color:var(--text2)">${fmtPct(tot.ft_made,tot.ft_attempted)}</small></td>
-              <td class="num">${tot.reb_def}+${tot.reb_off}</td>
-              <td class="num">${tot.assists}</td>
-              <td class="num">${tot.steals}</td>
-              <td class="num">${tot.turnovers}</td>
+              <td class="num hide-tablet">${tot.fg2_made}/${tot.fg2_attempted}
+                <small style="color:var(--text2)">${fmtPct(tot.fg2_made,tot.fg2_attempted)}</small></td>
+              <td class="num hide-tablet">${tot.fg3_made}/${tot.fg3_attempted}
+                <small style="color:var(--text2)">${fmtPct(tot.fg3_made,tot.fg3_attempted)}</small></td>
+              <td class="num hide-tablet">${tot.ft_made}/${tot.ft_attempted}
+                <small style="color:var(--text2)">${fmtPct(tot.ft_made,tot.ft_attempted)}</small></td>
               <td class="num">${tot.valuation}</td>
-              <td></td><td></td>
+              <td></td><td class="hide-mobile"></td>
             </tr>
           </tbody>
         </table>

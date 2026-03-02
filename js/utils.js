@@ -10,13 +10,13 @@ export function formatMinutes(dec) {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-/** Stat por minuto (2 decimales) */
+/** Stat por minuto */
 export function perMin(stat, minutes) {
   if (!minutes || minutes < 1) return null
   return stat / minutes
 }
 
-/** Stat proyectado a 40 minutos */
+/** Stat proyectado a 40 minutos (mantenido por compatibilidad) */
 export function per40(stat, minutes) {
   if (!minutes || minutes < 1) return null
   return (stat / minutes) * 40
@@ -28,7 +28,7 @@ export function fmt(value, decimals = 1) {
   return Number(value).toFixed(decimals)
 }
 
-/** Formatea porcentaje: 0.571 → "57.1%" */
+/** Formatea porcentaje: made=4, attempted=7 → "57.1%" */
 export function fmtPct(made, attempted) {
   if (!attempted) return '—'
   return ((made / attempted) * 100).toFixed(1) + '%'
@@ -43,10 +43,17 @@ export function shortName(fullName) {
   return initial ? `${initial}. ${surname}` : surname
 }
 
-/** Capitaliza: "VALCUDE ALCOBENDAS" → "Valcude Alcobendas" */
+/**
+ * Capitaliza correctamente nombres en español.
+ * Funciona con letras acentuadas: "GARCíA" → "García"
+ * Capitaliza tras espacios, guiones y comas.
+ */
 export function titleCase(str) {
   if (!str) return ''
-  return str.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
+  return str.toLowerCase().replace(
+    /(^|[\s\-,])([a-z\u00e0-\u00ff])/g,
+    (match, sep, char) => sep + char.toUpperCase()
+  )
 }
 
 /** Añade clase CSS según resultado (W/L) */
@@ -54,13 +61,6 @@ export function resultClass(team1Score, team2Score, isTeam1) {
   if (team1Score === null || team2Score === null) return ''
   const won = isTeam1 ? team1Score > team2Score : team2Score > team1Score
   return won ? 'result-win' : 'result-loss'
-}
-
-/** Genera el HTML de una celda de stat con badge por/min */
-export function statCell(value, minutes, showPerMin = false) {
-  if (!showPerMin || !minutes || minutes < 1) return fmt(value, 0)
-  const rate = per40(value, minutes)
-  return `${fmt(value, 0)} <small class="per40">${fmt(rate)}/40</small>`
 }
 
 /** Agrega estadísticas de un array de player_stats para un jugador */
@@ -88,18 +88,12 @@ export function aggregateStats(rows) {
   const m = totals.minutes
   return {
     ...totals,
-    avg_pts:  totals.points   / g,
-    avg_min:  m / g,
-    avg_reb:  totals.reb_total / g,
-    avg_ast:  totals.assists  / g,
-    avg_stl:  totals.steals   / g,
-    avg_to:   totals.turnovers / g,
-    avg_val:  totals.valuation / g,
-    avg_pm:   totals.plus_minus / g,
-    per40_pts: per40(totals.points,    m),
-    per40_reb: per40(totals.reb_total, m),
-    per40_ast: per40(totals.assists,   m),
-    per40_val: per40(totals.valuation, m),
+    avg_pts:     totals.points    / g,
+    avg_min:     m / g,
+    avg_val:     totals.valuation / g,
+    avg_pm:      totals.plus_minus / g,
+    perMin_pts:  perMin(totals.points,    m),
+    perMin_val:  perMin(totals.valuation, m),
     fg2_pct: fmtPct(totals.fg2_made, totals.fg2_attempted),
     fg3_pct: fmtPct(totals.fg3_made, totals.fg3_attempted),
     ft_pct:  fmtPct(totals.ft_made,  totals.ft_attempted),

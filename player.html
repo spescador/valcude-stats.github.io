@@ -29,54 +29,58 @@
 <script type="module">
 import { getPlayers, getPlayerFull } from './js/db.js'
 import { updateNavAuth } from './js/auth.js'
-import { fmt, fmtPct, titleCase, formatMinutes, aggregateStats, per40 } from './js/utils.js'
+import { fmt, fmtPct, titleCase, formatMinutes, aggregateStats } from './js/utils.js'
 
 updateNavAuth()
 
-const params = new URLSearchParams(location.search)
+const params   = new URLSearchParams(location.search)
 const playerId = params.get('id')
 
 async function init() {
   const content = document.getElementById('content')
 
   if (!playerId) {
-    // Lista de jugadoras
+    // Lista de jugadoras agrupada por equipo
     const players = await getPlayers()
-    // Agrupar por equipo
-    const byTeam = {}
+    const byTeam  = {}
     for (const p of players) {
       const tname = p.team?.name || 'Sin equipo'
       if (!byTeam[tname]) byTeam[tname] = []
       byTeam[tname].push(p)
     }
     content.innerHTML = `
-      <div class="page-header"><h1>Jugadoras</h1><p>${players.length} jugadoras registradas</p></div>
+      <div class="page-header">
+        <h1>Jugadoras</h1>
+        <p>${players.length} jugadoras registradas</p>
+      </div>
       ${Object.entries(byTeam).sort(([a],[b]) => a.localeCompare(b)).map(([team, ps]) => `
         <div class="panel" style="margin-bottom:1rem">
           <div class="panel-header"><h2>${titleCase(team)}</h2></div>
-          <div class="table-wrap">
-            <table>
-              <thead><tr><th>Jugadora</th></tr></thead>
-              <tbody>
-                ${ps.map(p => `<tr><td><a href="player.html?id=${p.id}">${titleCase(p.name)}</a></td></tr>`).join('')}
-              </tbody>
-            </table>
-          </div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Jugadora</th></tr></thead>
+            <tbody>
+              ${ps.map(p => `<tr><td><a href="player.html?id=${p.id}">${titleCase(p.name)}</a></td></tr>`).join('')}
+            </tbody>
+          </table></div>
         </div>`).join('')}
     `
     return
   }
 
   // Perfil de jugadora
-  const { player, stats } = await getPlayerFull(playerId)
-  const agg = aggregateStats(stats)
+  const { player, stats: rawStats } = await getPlayerFull(playerId)
 
+  // Ordenar por jornada (de menor a mayor)
+  const stats = [...rawStats].sort((a, b) =>
+    (a.match?.jornada || 999) - (b.match?.jornada || 999)
+  )
+
+  const agg = aggregateStats(stats)
   if (!agg) {
     content.innerHTML = '<div class="empty">Sin datos para esta jugadora</div>'
     return
   }
 
-  // Última dorsal usada
   const lastJersey = stats[stats.length - 1]?.jersey_number || '—'
 
   content.innerHTML = `
@@ -87,42 +91,38 @@ async function init() {
       <div class="player-info">
         <h1>${titleCase(player.name)}</h1>
         <div class="team">${titleCase(player.team?.name || '')}</div>
-        <div style="margin-top:.5rem;color:var(--text2);font-size:.85rem">${agg.games} partidos jugados</div>
+        <div style="margin-top:.4rem;color:var(--text2);font-size:.83rem">${agg.games} partidos jugados</div>
       </div>
     </div>
 
     <!-- Medias -->
     <div class="player-avg-grid">
-      ${avgCard('PTS', fmt(agg.avg_pts,1), fmt(agg.per40_pts,1)+'/40')}
-      ${avgCard('REB', fmt(agg.avg_reb,1), fmt(agg.per40_reb,1)+'/40')}
-      ${avgCard('AST', fmt(agg.avg_ast,1), fmt(agg.per40_ast,1)+'/40')}
-      ${avgCard('VAL', fmt(agg.avg_val,1), fmt(agg.per40_val,1)+'/40')}
-      ${avgCard('MIN', fmt(agg.avg_min,1)+"'", '')}
-      ${avgCard('+/-', (agg.avg_pm > 0 ? '+' : '') + fmt(agg.avg_pm,1), '')}
+      ${avgCard('PTS', fmt(agg.avg_pts, 1), fmt(agg.perMin_pts, 2) + ' pts/min')}
+      ${avgCard('VAL', fmt(agg.avg_val, 1), fmt(agg.perMin_val, 2) + ' val/min')}
+      ${avgCard('MIN', fmt(agg.avg_min, 1) + "'", '')}
+      ${avgCard('+/-', (agg.avg_pm > 0 ? '+' : '') + fmt(agg.avg_pm, 1), '')}
     </div>
 
     <!-- Porcentajes de tiro -->
-    <div class="panel" style="margin-bottom:1.5rem">
+    <div class="panel" style="margin-bottom:1.25rem">
       <div class="panel-header"><h2>Porcentajes de tiro</h2></div>
       <div class="panel-body">
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;text-align:center">
           ${shootingCard('TC2', agg.fg2_made, agg.fg2_attempted, agg.fg2_pct)}
           ${shootingCard('TC3', agg.fg3_made, agg.fg3_attempted, agg.fg3_pct)}
-          ${shootingCard('TL', agg.ft_made, agg.ft_attempted, agg.ft_pct)}
+          ${shootingCard('TL',  agg.ft_made,  agg.ft_attempted,  agg.ft_pct)}
         </div>
       </div>
     </div>
 
     <!-- Gráfico de evolución -->
-    <div class="panel" style="margin-bottom:1.5rem">
+    <div class="panel" style="margin-bottom:1.25rem">
       <div class="panel-header">
         <h2>Evolución por partido</h2>
         <div class="tabs" id="chartTabs">
-          <button class="tab active" data-key="points">PTS</button>
-          <button class="tab" data-key="valuation">VAL</button>
-          <button class="tab" data-key="reb_total">REB</button>
-          <button class="tab" data-key="assists">AST</button>
-          <button class="tab" data-key="minutes">MIN</button>
+          <button class="tab active" data-key="points"    data-label="PTS">PTS</button>
+          <button class="tab"        data-key="valuation" data-label="VAL">VAL</button>
+          <button class="tab"        data-key="minutes"   data-label="MIN">MIN</button>
         </div>
       </div>
       <div class="panel-body">
@@ -137,41 +137,43 @@ async function init() {
         <table>
           <thead>
             <tr>
-              <th>J</th><th>Rival</th><th>Res.</th>
-              <th class="num">MIN</th><th class="num">PTS</th>
-              <th class="num">TC2</th><th class="num">TC3</th><th class="num">TL</th>
-              <th class="num">REB</th><th class="num">AST</th><th class="num">REC</th>
-              <th class="num">PER</th><th class="num">VAL</th>
-              <th class="num" title="Puntos proyectados a 40min">Pts/40'</th>
-              <th class="num" title="Valoración proyectada a 40min">Val/40'</th>
+              <th>J</th>
+              <th>Rival</th>
+              <th class="hide-mobile">Res.</th>
+              <th class="num">MIN</th>
+              <th class="num">PTS</th>
+              <th class="num hide-tablet">TC2</th>
+              <th class="num hide-tablet">TC3</th>
+              <th class="num hide-tablet">TL</th>
+              <th class="num">VAL</th>
+              <th class="num hide-mobile" title="Puntos por minuto">Pts/min</th>
+              <th class="num hide-mobile" title="Valoración por minuto">Val/min</th>
             </tr>
           </thead>
           <tbody>
             ${stats.map(s => {
-              const m = s.match
-              const isV1 = m?.team1?.name?.includes('VALCUDE')
-              const myScore = isV1 ? m?.team1_score : m?.team2_score
-              const theirScore = isV1 ? m?.team2_score : m?.team1_score
-              const rival = isV1 ? m?.team2?.name : m?.team1?.name
-              const won = myScore > theirScore
-              const min = Number(s.minutes)
-              const hasMin = min > 1
-              return `<tr class="gamelog-row">
+              const m        = s.match
+              const isV1     = m?.team1?.name?.includes('VALCUDE')
+              const myScore  = isV1 ? m?.team1_score : m?.team2_score
+              const thScore  = isV1 ? m?.team2_score : m?.team1_score
+              const rival    = isV1 ? m?.team2?.name : m?.team1?.name
+              const won      = myScore > thScore
+              const min      = Number(s.minutes)
+              const hasMin   = min > 0.5
+              return `<tr>
                 <td><a href="match.html?id=${m?.id}">${m?.jornada || '?'}</a></td>
-                <td>${titleCase(rival || '')}</td>
-                <td><span class="badge ${won ? 'badge-win' : 'badge-loss'}">${won ? 'V' : 'D'} ${myScore}-${theirScore}</span></td>
+                <td style="max-width:110px;overflow:hidden;text-overflow:ellipsis">${titleCase(rival || '')}</td>
+                <td class="hide-mobile">
+                  <span class="badge ${won ? 'badge-win' : 'badge-loss'}">${won ? 'V' : 'D'} ${myScore}-${thScore}</span>
+                </td>
                 <td class="num">${formatMinutes(min)}</td>
                 <td class="num highlight"><strong>${s.points}</strong></td>
-                <td class="num">${s.fg2_made}/${s.fg2_attempted}</td>
-                <td class="num">${s.fg3_made}/${s.fg3_attempted}</td>
-                <td class="num">${s.ft_made}/${s.ft_attempted}</td>
-                <td class="num">${s.reb_def}+${s.reb_off}</td>
-                <td class="num">${s.assists}</td>
-                <td class="num">${s.steals}</td>
-                <td class="num">${s.turnovers}</td>
+                <td class="num hide-tablet">${s.fg2_made}/${s.fg2_attempted}</td>
+                <td class="num hide-tablet">${s.fg3_made}/${s.fg3_attempted}</td>
+                <td class="num hide-tablet">${s.ft_made}/${s.ft_attempted}</td>
                 <td class="num">${s.valuation}</td>
-                <td class="num" style="color:var(--accent)">${hasMin ? fmt(s.points / min * 40, 1) : '—'}</td>
-                <td class="num" style="color:var(--accent)">${hasMin ? fmt(s.valuation / min * 40, 1) : '—'}</td>
+                <td class="num hide-mobile" style="color:var(--text2)">${hasMin ? fmt(s.points    / min, 2) : '—'}</td>
+                <td class="num hide-mobile" style="color:var(--text2)">${hasMin ? fmt(s.valuation / min, 2) : '—'}</td>
               </tr>`
             }).join('')}
           </tbody>
@@ -180,8 +182,8 @@ async function init() {
     </div>
   `
 
-  // Gráfico
-  let chart = buildChart(stats, 'points')
+  // Gráfico inicial
+  let chart = buildChart(stats, 'points', 'PTS')
 
   document.getElementById('chartTabs').addEventListener('click', e => {
     const btn = e.target.closest('.tab')
@@ -189,7 +191,7 @@ async function init() {
     document.querySelectorAll('#chartTabs .tab').forEach(t => t.classList.remove('active'))
     btn.classList.add('active')
     chart.destroy()
-    chart = buildChart(stats, btn.dataset.key)
+    chart = buildChart(stats, btn.dataset.key, btn.dataset.label)
   })
 }
 
@@ -208,10 +210,11 @@ function shootingCard(label, made, attempted, pct) {
   </div>`
 }
 
-function buildChart(stats, key) {
-  const labels = stats.map((s, i) => `J${s.match?.jornada || i + 1}`)
+function buildChart(stats, key, label) {
+  // Stats ya ordenados por jornada (J1 → J15...)
+  const labels = stats.map(s => `J${s.match?.jornada || '?'}`)
   const values = stats.map(s => Number(s[key]) || 0)
-  const avg = values.reduce((a, b) => a + b, 0) / values.length
+  const avg    = values.reduce((a, b) => a + b, 0) / (values.length || 1)
 
   const ctx = document.getElementById('evChart').getContext('2d')
   return new Chart(ctx, {
@@ -220,19 +223,22 @@ function buildChart(stats, key) {
       labels,
       datasets: [
         {
-          label: key,
+          label,
           data: values,
-          backgroundColor: 'rgba(249,115,22,.7)',
+          backgroundColor: 'rgba(22,163,74,.6)',
+          borderColor:     'rgba(21,128,61,.9)',
+          borderWidth: 1,
           borderRadius: 4,
         },
         {
           label: 'Media',
           data: values.map(() => avg),
           type: 'line',
-          borderColor: 'rgba(255,255,255,.4)',
-          borderDash: [4, 4],
-          pointRadius: 0,
-          fill: false,
+          borderColor:   'rgba(21,128,61,.45)',
+          borderDash:    [5, 4],
+          borderWidth:   2,
+          pointRadius:   0,
+          fill:          false,
         },
       ],
     },
@@ -241,8 +247,15 @@ function buildChart(stats, key) {
       maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
-        x: { ticks: { color: '#8b91a8' }, grid: { color: 'rgba(255,255,255,.05)' } },
-        y: { ticks: { color: '#8b91a8' }, grid: { color: 'rgba(255,255,255,.05)' }, beginAtZero: true },
+        x: {
+          ticks: { color: '#527252', font: { size: 11 } },
+          grid:  { color: 'rgba(0,0,0,.06)' },
+        },
+        y: {
+          ticks: { color: '#527252', font: { size: 11 } },
+          grid:  { color: 'rgba(0,0,0,.06)' },
+          beginAtZero: true,
+        },
       },
     },
   })

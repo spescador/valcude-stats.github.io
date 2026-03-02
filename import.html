@@ -247,14 +247,12 @@ function previewTable(players) {
     <td class="num">${p.fg2_made}/${p.fg2_attempted}</td>
     <td class="num">${p.fg3_made}/${p.fg3_attempted}</td>
     <td class="num">${p.ft_made}/${p.ft_attempted}</td>
-    <td class="num">${p.reb_total}</td>
-    <td class="num">${p.assists}</td>
     <td class="num">${p.valuation}</td>
   </tr>`).join('')
   return `<div class="table-wrap"><table>
     <thead><tr><th>#</th><th>Nombre</th><th class="num">MIN</th><th class="num">PTS</th>
     <th class="num">TC2</th><th class="num">TC3</th><th class="num">TL</th>
-    <th class="num">REB</th><th class="num">AST</th><th class="num">VAL</th></tr></thead>
+    <th class="num">VAL</th></tr></thead>
     <tbody>${rows}</tbody>
   </table></div>`
 }
