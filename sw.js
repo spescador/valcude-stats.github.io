@@ -3,7 +3,7 @@
 // Estrategia: cache-first para estáticos, network-only para API
 // ================================================================
 
-const CACHE_NAME = 'valcude-v1'
+const CACHE_NAME = 'valcude-v2'
 
 const STATIC_ASSETS = [
   './',
@@ -48,6 +48,11 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const { request } = event
   const url = new URL(request.url)
+
+  // En localhost → siempre red (desarrollo, sin caché)
+  if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+    return  // dejar que el navegador gestione directamente
+  }
 
   // Supabase, esm.sh y CDN externos → siempre red
   if (

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Limpiando caché…</title>
+  <style>
+    body { font-family: system-ui; display: flex; align-items: center; justify-content: center;
+           min-height: 100vh; margin: 0; background: #eef7ee; color: #1a2e1a; flex-direction: column; gap: 1rem; }
+    p { font-size: 1.1rem; }
+  </style>
+</head>
+<body>
+  <p>🧹 Limpiando caché y service worker…</p>
+  <script>
+    async function clearAll() {
+      // Desregistrar todos los service workers
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations()
+        await Promise.all(regs.map(r => r.unregister()))
+      }
+      // Borrar todos los cachés
+      const keys = await caches.keys()
+      await Promise.all(keys.map(k => caches.delete(k)))
+      // Redirigir a la app
+      location.replace('./pin.html')
+    }
+    clearAll()
+  </script>
+</body>
+</html>

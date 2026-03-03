@@ -60,6 +60,22 @@ nav {
 }
 .nav-spacer { flex: 1; }
 
+/* ── Nav: icon + sep + admin (desktop) ──────────────── */
+.nav-icon { display: none; }
+.nav-sep  { flex: 1; }
+.nav-links .nav-admin {
+  background: rgba(255,255,255,.15);
+  padding: .3rem .7rem;
+  border-radius: 6px;
+  font-size: .8rem;
+  font-weight: 600;
+}
+.nav-links .nav-admin:hover {
+  background: rgba(255,255,255,.25);
+  color: #fff;
+  text-decoration: none;
+}
+
 /* ── Buttons ────────────────────────────────────────── */
 .btn {
   display: inline-flex;
@@ -127,7 +143,8 @@ nav {
   margin-bottom: .35rem;
 }
 .stat-card .value { font-size: 1.75rem; font-weight: 700; line-height: 1; }
-.stat-card .sub   { font-size: .78rem; color: var(--text2); margin-top: .2rem; }
+.stat-card .sub      { font-size: .78rem; color: var(--text2); margin-top: .2rem; }
+.stat-card .rank-pos { font-size: .72rem; font-weight: 700; color: #d4a017; margin-top: .15rem; line-height: 1; }
 
 /* ── Two-column layout ──────────────────────────────── */
 .two-col {
@@ -422,4 +439,51 @@ td.highlight { color: var(--accent2); font-weight: 700; }
   color: var(--text2);
   padding: 2rem;
   font-size: .9rem;
+}
+
+/* ── Nav inferior — sólo móvil ──────────────────────── */
+@media (max-width: 640px) {
+  body { overflow-x: hidden; padding-bottom: calc(62px + env(safe-area-inset-bottom, 0px)); }
+
+  nav {
+    position: fixed; top: auto; bottom: 0; left: 0; right: 0; width: 100%;
+    height: auto; padding: 0; gap: 0;
+    border-top: 1px solid rgba(255,255,255,.18);
+    box-shadow: 0 -2px 16px rgba(0,0,0,.18);
+  }
+
+  .nav-logo { display: none !important; }
+  .nav-sep  { display: none !important; }
+
+  .nav-links { width: 100%; gap: 0; justify-content: stretch; }
+
+  .nav-links a,
+  .nav-links .nav-admin {
+    flex: 1;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: .45rem .25rem calc(.45rem + env(safe-area-inset-bottom, 0px));
+    gap: .2rem;
+    font-size: .62rem; font-weight: 600;
+    letter-spacing: .04em; text-transform: uppercase;
+    border-radius: 0 !important; background: transparent !important;
+    color: rgba(255,255,255,.5);
+    border-top: 2px solid transparent;
+    transition: color .15s, border-color .15s;
+    text-decoration: none !important;
+  }
+  .nav-links a.active,
+  .nav-links .nav-admin.active {
+    color: #fff;
+    border-top-color: rgba(255,255,255,.85);
+  }
+  .nav-links a:hover,
+  .nav-links .nav-admin:hover {
+    color: rgba(255,255,255,.8) !important;
+    text-decoration: none !important;
+  }
+
+  .nav-icon { display: block; width: 22px; height: 22px; }
+
+  .chart-wrap { height: 260px !important; }
 }

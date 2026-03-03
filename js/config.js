@@ -10,4 +10,4 @@ export const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 export const HOME_TEAM = 'VALCUDE ALCOBENDAS'
 
 // PIN de acceso a la app (cámbialo aquí)
-export const APP_PIN = '2026'
+export const APP_PIN = '20252026'

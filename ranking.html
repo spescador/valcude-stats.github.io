@@ -29,10 +29,18 @@
 
     /* ── Secondary stat (percentage below fraction) ─ */
     td.num small {
-      display: block;
       font-size: .72rem;
       color: var(--text2);
-      line-height: 1.2;
+    }
+
+    /* ── Three-col chart row ─────────────────────── */
+    .three-col {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.25rem;
+    }
+    @media (max-width: 900px) {
+      .three-col { grid-template-columns: 1fr; }
     }
 
     /* ── Chart panel ─────────────────────────────── */
@@ -56,6 +64,17 @@
       position: relative;
       height: 420px;
     }
+
+    /* ── Tabs de columnas (Puntos / Tiro) — solo móvil ── */
+    #rankTable.view-pts  .v-tiro { display: none; }
+    #rankTable.view-tiro .v-pts  { display: none; }
+
+    /* ── Desktop: todas las columnas visibles, sin tabs ── */
+    @media (min-width: 641px) {
+      #viewTabs { display: none; }
+      #rankTable .v-tiro,
+      #rankTable .v-pts  { display: table-cell !important; }
+    }
   </style>
 </head>
 <body>
@@ -63,13 +82,20 @@
 <nav>
   <div class="nav-logo">🏀 <span>Valcude</span> Stats</div>
   <div class="nav-links">
-    <a href="index.html">Dashboard</a>
-    <a href="match.html">Partidos</a>
-    <a href="player.html">Jugadoras</a>
-    <a href="ranking.html" class="active">Rankings</a>
+    <a href="index.html">
+      <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="7" height="7" rx="1.5"/><rect x="11" y="2" width="7" height="7" rx="1.5"/><rect x="2" y="11" width="7" height="7" rx="1.5"/><rect x="11" y="11" width="7" height="7" rx="1.5"/></svg>
+      Dashboard
+    </a>
+    <a href="ranking.html" class="active">
+      <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="9" width="4" height="9" rx="1"/><rect x="8" y="4" width="4" height="14" rx="1"/><rect x="14" y="12" width="4" height="6" rx="1"/></svg>
+      Rankings
+    </a>
+    <span class="nav-sep"></span>
+    <a href="import.html" class="nav-admin">
+      <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="9" width="12" height="9" rx="2"/><path d="M7 9V6.5a3 3 0 016 0V9"/></svg>
+      Admin
+    </a>
   </div>
-  <div class="nav-spacer"></div>
-  <a href="import.html" class="btn btn-ghost" style="font-size:.8rem;padding:.3rem .7rem">Administrador</a>
 </nav>
 
 <div class="page">
@@ -82,35 +108,46 @@
     <select id="teamFilter">
       <option value="">Todos los equipos</option>
     </select>
+    <select id="playerFilter">
+      <option value="">Todas las jugadoras</option>
+    </select>
   </div>
 
   <!-- Tabla -->
   <div class="panel">
+    <div class="panel-header">
+      <h2>Ranking por jugadora</h2>
+      <div class="tabs" id="viewTabs">
+        <button class="tab active" data-view="pts">Puntos</button>
+        <button class="tab" data-view="tiro">Tiro</button>
+      </div>
+    </div>
     <div class="table-wrap">
-      <table id="rankTable">
+      <table id="rankTable" class="view-pts">
         <thead>
           <tr>
             <th>#</th>
             <th class="sortable sort-none" data-col="name">Jugadora<span class="sort-icon"></span></th>
             <th class="sortable sort-none hide-mobile" data-col="team">Equipo<span class="sort-icon"></span></th>
-            <th class="sortable sort-none num hide-tablet" data-col="games">PJ<span class="sort-icon"></span></th>
-            <th class="sortable sort-desc num" data-col="avg_pts">PTS<span class="sort-icon"></span></th>
-            <th class="sortable sort-none num hide-tablet" data-col="avg_fg2">TC2<span class="sort-icon"></span></th>
-            <th class="sortable sort-none num hide-tablet" data-col="avg_fg3">TC3<span class="sort-icon"></span></th>
-            <th class="sortable sort-none num hide-tablet" data-col="ft_pct_n">TL<span class="sort-icon"></span></th>
-            <th class="sortable sort-none num hide-mobile" data-col="avg_fc">FC<span class="sort-icon"></span></th>
-            <th class="sortable sort-none num" data-col="perMin_pts">Pts/min<span class="sort-icon"></span></th>
+            <th class="sortable sort-none num v-pts" data-col="games">PJ<span class="sort-icon"></span></th>
+            <th class="sortable sort-desc num v-pts" data-col="avg_pts">PTS<span class="sort-icon"></span></th>
+            <th class="sortable sort-none num v-tiro" data-col="avg_fg2">TC2<span class="sort-icon"></span></th>
+            <th class="sortable sort-none num v-tiro" data-col="avg_fg3">TC3<span class="sort-icon"></span></th>
+            <th class="sortable sort-none num v-tiro" data-col="ft_made">TL<span class="sort-icon"></span></th>
+            <th class="sortable sort-none num v-tiro" data-col="ft_pct_n">%TL<span class="sort-icon"></span></th>
+            <th class="sortable sort-none num v-pts hide-mobile" data-col="avg_fc">FC<span class="sort-icon"></span></th>
+            <th class="sortable sort-none num v-pts" data-col="perMin_pts">Pts/min<span class="sort-icon"></span></th>
           </tr>
         </thead>
         <tbody id="rankBody">
-          <tr><td colspan="10" class="loading"><div class="spinner"></div></td></tr>
+          <tr><td colspan="11" class="loading"><div class="spinner"></div></td></tr>
         </tbody>
       </table>
     </div>
   </div>
 
   <!-- Gráficos -->
-  <div class="two-col" style="margin-top:1.5rem">
+  <div class="three-col" style="margin-top:1.5rem">
 
     <div class="panel chart-panel" style="margin-top:0">
       <div class="panel-header">
@@ -127,6 +164,15 @@
       </div>
       <div class="chart-wrap">
         <canvas id="ppmChart"></canvas>
+      </div>
+    </div>
+
+    <div class="panel chart-panel" style="margin-top:0">
+      <div class="panel-header">
+        <h2>Triples anotados</h2>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="fg3Chart"></canvas>
       </div>
     </div>
 
@@ -161,14 +207,16 @@ const COL_META = {
   games:      { label: 'Partidos jugados',          scale: 1,   dec: 0 },
 }
 
-let allPlayers    = []
-let allTeams      = []
-let selectedTeamId = null
+let allPlayers     = []
+let allTeams       = []
+let selectedTeamId  = null
+let selectedPlayerId = null
 let sortCol        = 'avg_pts'
 let sortDir        = 'desc'
 let chartCol       = 'avg_pts'   // columna activa del gráfico (solo numéricas)
 let chart          = null
 let chartPpm       = null
+let chartFg3       = null
 
 /* ── Carga datos ──────────────────────────────────────── */
 async function loadData() {
@@ -223,9 +271,29 @@ async function loadData() {
     .filter(p => p.games > 0)
 }
 
+/* ── Poblar selector de jugadoras ─────────────────────── */
+function populatePlayerFilter() {
+  const sel = document.getElementById('playerFilter')
+  sel.innerHTML = '<option value="">Todas las jugadoras</option>'
+  const sorted = [...allPlayers].sort((a, b) =>
+    (a.player?.name || '').localeCompare(b.player?.name || '', 'es')
+  )
+  for (const p of sorted) {
+    const opt = document.createElement('option')
+    opt.value = p.player.id
+    opt.textContent = titleCase(p.player.name)
+    sel.appendChild(opt)
+  }
+  sel.value = ''
+  selectedPlayerId = null
+}
+
 /* ── Render tabla ─────────────────────────────────────── */
 function sortedPlayers() {
-  return [...allPlayers].sort((a, b) => {
+  const players = selectedPlayerId
+    ? allPlayers.filter(p => p.player.id === selectedPlayerId)
+    : allPlayers
+  return [...players].sort((a, b) => {
     let av = a[sortCol], bv = b[sortCol]
     if (sortCol === 'name') { av = a.player?.name || ''; bv = b.player?.name || '' }
     if (sortCol === 'team') { av = a.player?.team?.name || ''; bv = b.player?.team?.name || '' }
@@ -252,18 +320,19 @@ function renderTable() {
       <td class="rank">${i + 1}</td>
       <td class="player-name"><a href="player.html?id=${p.player.id}">${titleCase(p.player.name)}</a></td>
       <td class="team-name hide-mobile">${titleCase(p.player.team?.name || '')}</td>
-      <td class="num hide-tablet">${p.games}</td>
-      <td class="num highlight"><strong>${fmt(p.avg_pts, 1)}</strong></td>
-      <td class="num hide-tablet"><strong>${fg2Str}</strong></td>
-      <td class="num hide-tablet"><strong>${fg3Str}</strong></td>
-      <td class="num hide-tablet"><strong>${ftStr}</strong><small>${p.ft_pct}</small></td>
-      <td class="num hide-mobile">${fmt(p.avg_fc, 1)}</td>
-      <td class="num">${p.perMin_pts != null ? fmt(p.perMin_pts, 3) : '—'}</td>
+      <td class="num v-pts">${p.games}</td>
+      <td class="num highlight v-pts"><strong>${fmt(p.avg_pts, 1)}</strong></td>
+      <td class="num v-tiro"><strong>${fg2Str}</strong></td>
+      <td class="num v-tiro"><strong>${fg3Str}</strong></td>
+      <td class="num v-tiro"><strong>${ftStr}</strong></td>
+      <td class="num v-tiro"><small>${p.ft_pct}</small></td>
+      <td class="num v-pts hide-mobile">${fmt(p.avg_fc, 1)}</td>
+      <td class="num v-pts">${p.perMin_pts != null ? fmt(p.perMin_pts, 3) : '—'}</td>
     </tr>`
   }).join('')
 
   document.getElementById('rankBody').innerHTML =
-    html || '<tr><td colspan="10" class="empty">Sin datos</td></tr>'
+    html || '<tr><td colspan="11" class="empty">Sin datos</td></tr>'
 
   // Indicadores de ordenación
   document.querySelectorAll('#rankTable th.sortable').forEach(th => {
@@ -280,10 +349,11 @@ function renderTable() {
     ? titleCase(allTeams.find(t => t.id === selectedTeamId)?.name || '')
     : 'Todos los equipos'
   document.getElementById('subtitle').textContent =
-    `${teamName} · ${allPlayers.length} jugadora${allPlayers.length !== 1 ? 's' : ''}`
+    `${teamName} · ${sorted.length} jugadora${sorted.length !== 1 ? 's' : ''}`
 
   renderChart()
   renderPpmChart()
+  renderFg3Chart()
 }
 
 /* ── Helper: construir gráfico de barras horizontal ────── */
@@ -381,6 +451,28 @@ function renderPpmChart() {
   }
 }
 
+/* ── Render gráfico fijo: Triples anotados ───────────── */
+function renderFg3Chart() {
+  if (!allPlayers.length) return
+
+  const top = [...allPlayers]
+    .filter(p => p.fg3_made != null)
+    .sort((a, b) => (b.fg3_made || 0) - (a.fg3_made || 0))
+    .slice(0, 15)
+
+  const labels  = top.map(p => shortName(p.player.name))
+  const values  = top.map(p => p.fg3_made)
+  const tickFmt = v => Number(v).toFixed(0)
+
+  if (chartFg3) {
+    chartFg3.data.labels           = labels
+    chartFg3.data.datasets[0].data = values
+    chartFg3.update('active')
+  } else {
+    chartFg3 = buildBarChart('fg3Chart', labels, values, 'Triples anotados', tickFmt)
+  }
+}
+
 /* ── Init ─────────────────────────────────────────────── */
 async function init() {
   allTeams = await getTeams()
@@ -394,10 +486,20 @@ async function init() {
   }
 
   await loadData()
+  populatePlayerFilter()
   renderTable()
 }
 
 /* ── Eventos ──────────────────────────────────────────── */
+/* ── Tabs de vista (Puntos / Tiro) ────────────────────── */
+document.getElementById('viewTabs').addEventListener('click', e => {
+  const btn = e.target.closest('.tab')
+  if (!btn) return
+  document.querySelectorAll('#viewTabs .tab').forEach(t => t.classList.remove('active'))
+  btn.classList.add('active')
+  document.getElementById('rankTable').className = `view-${btn.dataset.view}`
+})
+
 document.getElementById('rankTable').addEventListener('click', e => {
   const th = e.target.closest('th.sortable')
   if (!th) return
@@ -415,8 +517,14 @@ document.getElementById('rankTable').addEventListener('click', e => {
 document.getElementById('teamFilter').addEventListener('change', async e => {
   selectedTeamId = e.target.value ? Number(e.target.value) : null
   document.getElementById('rankBody').innerHTML =
-    '<tr><td colspan="10" class="loading"><div class="spinner"></div></td></tr>'
+    '<tr><td colspan="11" class="loading"><div class="spinner"></div></td></tr>'
   await loadData()
+  populatePlayerFilter()
+  renderTable()
+})
+
+document.getElementById('playerFilter').addEventListener('change', e => {
+  selectedPlayerId = e.target.value ? Number(e.target.value) : null
   renderTable()
 })
 

@@ -18,13 +18,20 @@
 <nav>
   <div class="nav-logo">🏀 <span>Valcude</span> Stats</div>
   <div class="nav-links">
-    <a href="index.html">Dashboard</a>
-    <a href="match.html">Partidos</a>
-    <a href="player.html" class="active">Jugadoras</a>
-    <a href="ranking.html">Rankings</a>
+    <a href="index.html">
+      <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="7" height="7" rx="1.5"/><rect x="11" y="2" width="7" height="7" rx="1.5"/><rect x="2" y="11" width="7" height="7" rx="1.5"/><rect x="11" y="11" width="7" height="7" rx="1.5"/></svg>
+      Dashboard
+    </a>
+    <a href="ranking.html">
+      <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="9" width="4" height="9" rx="1"/><rect x="8" y="4" width="4" height="14" rx="1"/><rect x="14" y="12" width="4" height="6" rx="1"/></svg>
+      Rankings
+    </a>
+    <span class="nav-sep"></span>
+    <a href="import.html" class="nav-admin">
+      <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="9" width="12" height="9" rx="2"/><path d="M7 9V6.5a3 3 0 016 0V9"/></svg>
+      Admin
+    </a>
   </div>
-  <div class="nav-spacer"></div>
-  <a href="import.html" class="btn btn-ghost" style="font-size:.8rem;padding:.3rem .7rem">Administrador</a>
 </nav>
 
 <div class="page">
@@ -35,7 +42,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 
 <script type="module">
-import { getPlayers, getPlayerFull } from './js/db.js'
+import { getPlayers, getPlayerFull, getLeaderboard } from './js/db.js'
 import { updateNavAuth } from './js/auth.js'
 import { fmt, fmtPct, titleCase, formatMinutes, aggregateStats } from './js/utils.js'
 import { requirePin } from './js/pin.js'
@@ -91,10 +98,23 @@ async function init() {
     return
   }
 
+  // Calcular posición en el ranking para cada métrica
+  let ranks = {}
+  try {
+    const lb = await getLeaderboard()
+    for (const metric of ['avg_pts', 'avg_val', 'avg_min', 'perMin_pts']) {
+      const sorted = [...lb]
+        .filter(p => p[metric] != null)
+        .sort((a, b) => (b[metric] || 0) - (a[metric] || 0))
+      const pos = sorted.findIndex(p => p.player?.id === Number(playerId))
+      if (pos >= 0) ranks[metric] = pos + 1
+    }
+  } catch (_) {}
+
   const lastJersey = stats[stats.length - 1]?.jersey_number || '—'
 
   content.innerHTML = `
-    <div class="page-header"><p><a href="player.html">← Todas las jugadoras</a></p></div>
+    <div class="page-header"><p><a href="javascript:history.back()">← Volver</a></p></div>
 
     <div class="player-header">
       <div class="player-number">#${lastJersey}</div>
@@ -107,9 +127,9 @@ async function init() {
 
     <!-- Medias -->
     <div class="player-avg-grid">
-      ${avgCard('PTS', fmt(agg.avg_pts, 1), fmt(agg.perMin_pts, 2) + ' pts/min')}
-      ${avgCard('VAL', fmt(agg.avg_val, 1), fmt(agg.perMin_val, 2) + ' val/min')}
-      ${avgCard('MIN', fmt(agg.avg_min, 1) + "'", '')}
+      ${avgCard('PTS', fmt(agg.avg_pts, 1), fmt(agg.perMin_pts, 2) + ' pts/min', ranks.avg_pts)}
+      ${avgCard('VAL', fmt(agg.avg_val, 1), fmt(agg.perMin_val, 2) + ' val/min', ranks.avg_val)}
+      ${avgCard('MIN', fmt(agg.avg_min, 1) + "'", '', ranks.avg_min)}
       ${avgCard('+/-', (agg.avg_pm > 0 ? '+' : '') + fmt(agg.avg_pm, 1), '')}
     </div>
 
@@ -205,10 +225,11 @@ async function init() {
   })
 }
 
-function avgCard(label, main, sub) {
+function avgCard(label, main, sub, rank) {
   return `<div class="stat-card">
     <div class="label">${label}</div>
     <div class="value">${main}</div>
+    ${rank != null ? `<div class="rank-pos">#${rank}</div>` : ''}
     ${sub ? `<div class="sub" style="color:var(--accent);font-weight:600">${sub}</div>` : ''}
   </div>`
 }
