@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rankings · Valcude Stats</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* ── Sortable headers ─────────────────────────── */
+    th.sortable {
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+    th.sortable:hover { background: var(--card2); }
+
+    th.sort-desc .sort-icon::after { content: ' ↓'; color: var(--accent); }
+    th.sort-asc  .sort-icon::after { content: ' ↑'; color: var(--accent); }
+    th.sort-none .sort-icon::after { content: ' ↕'; color: var(--text2); opacity: .4; }
+
+    .sort-icon { font-size: .75em; }
+
+    /* ── Secondary stat (avg made/att) ─────────────── */
+    td.num small {
+      display: block;
+      font-size: .75rem;
+      color: var(--text2);
+      line-height: 1.2;
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">🏀 <span>Valcude</span> Stats</div>
+  <div class="nav-links">
+    <a href="index.html">Dashboard</a>
+    <a href="match.html">Partidos</a>
+    <a href="player.html">Jugadoras</a>
+    <a href="ranking.html" class="active">Rankings</a>
+  </div>
+  <div class="nav-spacer"></div>
+  <a href="import.html" class="btn btn-ghost" style="font-size:.8rem;padding:.3rem .7rem">Administrador</a>
+</nav>
+
+<div class="page">
+  <div class="page-header">
+    <h1>Rankings</h1>
+    <p id="subtitle">Cargando…</p>
+  </div>
+
+  <div class="filters">
+    <select id="teamFilter">
+      <option value="">Todos los equipos</option>
+    </select>
+  </div>
+
+  <div class="panel">
+    <div class="table-wrap">
+      <table id="rankTable">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th class="sortable sort-none" data-col="name">Jugadora<span class="sort-icon"></span></th>
+            <th class="sortable sort-none hide-mobile" data-col="team">Equipo<span class="sort-icon"></span></th>
+            <th class="sortable sort-none num hide-tablet" data-col="games">PJ<span class="sort-icon"></span></th>
+            <th class="sortable sort-desc num" data-col="avg_pts">PTS<span class="sort-icon"></span></th>
+            <th class="sortable sort-none num hide-tablet" data-col="fg2_pct_n">TC2<span class="sort-icon"></span></th>
+            <th class="sortable sort-none num hide-tablet" data-col="fg3_pct_n">TC3<span class="sort-icon"></span></th>
+            <th class="sortable sort-none num hide-tablet" data-col="ft_pct_n">TL<span class="sort-icon"></span></th>
+            <th class="sortable sort-none num hide-mobile" data-col="avg_fc">FC<span class="sort-icon"></span></th>
+            <th class="sortable sort-none num" data-col="perMin_pts">Pts/min<span class="sort-icon"></span></th>
+          </tr>
+        </thead>
+        <tbody id="rankBody">
+          <tr><td colspan="10" class="loading"><div class="spinner"></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { getClient, getTeams } from './js/db.js'
+import { aggregateStats, fmt, titleCase } from './js/utils.js'
+import { requirePin } from './js/pin.js'
+import { updateNavAuth } from './js/auth.js'
+
+requirePin()
+updateNavAuth()
+
+let allPlayers    = []
+let allTeams      = []
+let selectedTeamId = null
+let sortCol        = 'avg_pts'
+let sortDir        = 'desc'   // 'asc' | 'desc'
+
+/* ── Carga datos desde Supabase ──────────────────────── */
+async function loadData() {
+  const sb = getClient()
+  let q = sb.from('player_stats').select(`
+    player_id, team_id, minutes, points,
+    fg2_made, fg2_attempted,
+    fg3_made, fg3_attempted,
+    ft_made,  ft_attempted,
+    fouls_committed,
+    player:player_id (id, name, team:team_id (id, name))
+  `)
+  if (selectedTeamId) q = q.eq('team_id', selectedTeamId)
+
+  const { data, error } = await q
+  if (error) throw error
+
+  // Agrupar filas por jugadora
+  const byPlayer = {}
+  for (const r of data) {
+    const pid = r.player_id
+    if (!byPlayer[pid]) byPlayer[pid] = { player: r.player, rows: [] }
+    byPlayer[pid].rows.push(r)
+  }
+
+  // Agregar estadísticas
+  allPlayers = Object.values(byPlayer)
+    .map(p => {
+      const s = aggregateStats(p.rows)
+      const g = s.games
+      return {
+        player:       p.player,
+        games:        g,
+        avg_pts:      s.avg_pts,
+        avg_min:      s.avg_min,
+        fg2_made:     s.fg2_made,
+        fg2_attempted: s.fg2_attempted,
+        fg2_pct:      s.fg2_pct,
+        fg2_pct_n:    s.fg2_attempted ? s.fg2_made / s.fg2_attempted : null,
+        fg3_made:     s.fg3_made,
+        fg3_attempted: s.fg3_attempted,
+        fg3_pct:      s.fg3_pct,
+        fg3_pct_n:    s.fg3_attempted ? s.fg3_made / s.fg3_attempted : null,
+        ft_made:      s.ft_made,
+        ft_attempted: s.ft_attempted,
+        ft_pct:       s.ft_pct,
+        ft_pct_n:     s.ft_attempted ? s.ft_made / s.ft_attempted : null,
+        avg_fc:       s.fouls_committed / g,
+        perMin_pts:   s.perMin_pts,
+      }
+    })
+    .filter(p => p.games > 0)
+}
+
+/* ── Render tabla ─────────────────────────────────────── */
+function renderTable() {
+  const sorted = [...allPlayers].sort((a, b) => {
+    let av = a[sortCol]
+    let bv = b[sortCol]
+
+    // Columnas de texto
+    if (sortCol === 'name') { av = a.player?.name || ''; bv = b.player?.name || '' }
+    if (sortCol === 'team') { av = a.player?.team?.name || ''; bv = b.player?.team?.name || '' }
+
+    if (typeof av === 'string') {
+      return sortDir === 'asc' ? av.localeCompare(bv, 'es') : bv.localeCompare(av, 'es')
+    }
+
+    // Nulls al fondo
+    if (av == null && bv == null) return 0
+    if (av == null) return 1
+    if (bv == null) return -1
+    return sortDir === 'asc' ? av - bv : bv - av
+  })
+
+  const html = sorted.map((p, i) => {
+    const fg2AvgMade = fmt(p.fg2_made     / p.games, 1)
+    const fg2AvgAtt  = fmt(p.fg2_attempted / p.games, 1)
+    const fg3AvgMade = fmt(p.fg3_made     / p.games, 1)
+    const fg3AvgAtt  = fmt(p.fg3_attempted / p.games, 1)
+    const ftAvgMade  = fmt(p.ft_made      / p.games, 1)
+    const ftAvgAtt   = fmt(p.ft_attempted  / p.games, 1)
+
+    return `<tr>
+      <td class="rank">${i + 1}</td>
+      <td class="player-name"><a href="player.html?id=${p.player.id}">${titleCase(p.player.name)}</a></td>
+      <td class="team-name hide-mobile">${titleCase(p.player.team?.name || '')}</td>
+      <td class="num hide-tablet">${p.games}</td>
+      <td class="num highlight"><strong>${fmt(p.avg_pts, 1)}</strong></td>
+      <td class="num hide-tablet">${p.fg2_pct}<small>${fg2AvgMade}/${fg2AvgAtt}</small></td>
+      <td class="num hide-tablet">${p.fg3_pct}<small>${fg3AvgMade}/${fg3AvgAtt}</small></td>
+      <td class="num hide-tablet">${p.ft_pct}<small>${ftAvgMade}/${ftAvgAtt}</small></td>
+      <td class="num hide-mobile">${fmt(p.avg_fc, 1)}</td>
+      <td class="num">${p.perMin_pts != null ? fmt(p.perMin_pts, 3) : '—'}</td>
+    </tr>`
+  }).join('')
+
+  document.getElementById('rankBody').innerHTML =
+    html || '<tr><td colspan="10" class="empty">Sin datos</td></tr>'
+
+  // Actualizar indicadores de ordenación
+  document.querySelectorAll('#rankTable th.sortable').forEach(th => {
+    const col = th.dataset.col
+    th.classList.remove('sort-asc', 'sort-desc', 'sort-none')
+    th.classList.add(col === sortCol
+      ? (sortDir === 'asc' ? 'sort-asc' : 'sort-desc')
+      : 'sort-none'
+    )
+  })
+
+  // Subtítulo
+  const teamName = selectedTeamId
+    ? titleCase(allTeams.find(t => t.id === selectedTeamId)?.name || '')
+    : 'Todos los equipos'
+  document.getElementById('subtitle').textContent =
+    `${teamName} · ${allPlayers.length} jugadora${allPlayers.length !== 1 ? 's' : ''}`
+}
+
+/* ── Init ─────────────────────────────────────────────── */
+async function init() {
+  allTeams = await getTeams()
+
+  const sel = document.getElementById('teamFilter')
+  for (const t of allTeams) {
+    const opt = document.createElement('option')
+    opt.value = t.id
+    opt.textContent = titleCase(t.name)
+    sel.appendChild(opt)
+  }
+
+  await loadData()
+  renderTable()
+}
+
+/* ── Eventos ──────────────────────────────────────────── */
+// Click en cabecera de columna → ordenar
+document.getElementById('rankTable').addEventListener('click', e => {
+  const th = e.target.closest('th.sortable')
+  if (!th) return
+  const col = th.dataset.col
+  if (col === sortCol) {
+    sortDir = sortDir === 'desc' ? 'asc' : 'desc'
+  } else {
+    sortCol = col
+    // Texto → ascendente por defecto; números → descendente
+    sortDir = (col === 'name' || col === 'team') ? 'asc' : 'desc'
+  }
+  renderTable()
+})
+
+// Selector de equipo
+document.getElementById('teamFilter').addEventListener('change', async e => {
+  selectedTeamId = e.target.value ? Number(e.target.value) : null
+  document.getElementById('rankBody').innerHTML =
+    '<tr><td colspan="10" class="loading"><div class="spinner"></div></td></tr>'
+  await loadData()
+  renderTable()
+})
+
+init().catch(console.error)
+</script>
+</body>
+</html>
