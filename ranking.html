@@ -65,11 +65,16 @@
       height: 420px;
     }
 
-    /* ── Nombre truncado en móvil para evitar scroll horizontal ── */
+    /* ── Tabla compacta en móvil para evitar scroll horizontal ── */
     @media (max-width: 640px) {
+      #rankTable thead th,
+      #rankTable tbody td {
+        padding: .35rem .3rem;
+        font-size: .78rem;
+      }
       #rankTable .player-name a {
         display: block;
-        max-width: 110px;
+        max-width: 90px;
         overflow: hidden;
         text-overflow: ellipsis;
       }
