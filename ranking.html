@@ -65,6 +65,16 @@
       height: 420px;
     }
 
+    /* ── Nombre truncado en móvil para evitar scroll horizontal ── */
+    @media (max-width: 640px) {
+      #rankTable .player-name a {
+        display: block;
+        max-width: 130px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+    }
+
     /* ── Tabs de columnas (Puntos / Tiro) — solo móvil ── */
     #rankTable.view-pts  .v-tiro { display: none; }
     #rankTable.view-tiro .v-pts  { display: none; }
