@@ -16,7 +16,7 @@
     <a href="player.html" class="active">Jugadoras</a>
   </div>
   <div class="nav-spacer"></div>
-  <a id="nav-import" href="import.html" class="btn btn-primary" style="display:none">+ Importar</a>
+  <a href="import.html" class="btn btn-ghost" style="font-size:.8rem;padding:.3rem .7rem">Administrador</a>
 </nav>
 
 <div class="page">
@@ -30,7 +30,9 @@
 import { getPlayers, getPlayerFull } from './js/db.js'
 import { updateNavAuth } from './js/auth.js'
 import { fmt, fmtPct, titleCase, formatMinutes, aggregateStats } from './js/utils.js'
+import { requirePin } from './js/pin.js'
 
+requirePin()
 updateNavAuth()
 
 const params   = new URLSearchParams(location.search)

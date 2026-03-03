@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Valcude Stats</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+
+    .pin-wrap {
+      text-align: center;
+      padding: 2rem 1.5rem;
+      width: 100%;
+      max-width: 320px;
+    }
+
+    .pin-logo {
+      font-size: 2.8rem;
+      margin-bottom: .4rem;
+    }
+    .pin-title {
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--accent);
+      margin-bottom: .25rem;
+    }
+    .pin-subtitle {
+      font-size: .85rem;
+      color: var(--text2);
+      margin-bottom: 2rem;
+    }
+
+    .pin-display {
+      display: flex;
+      justify-content: center;
+      gap: .6rem;
+      margin-bottom: 1.75rem;
+    }
+    .pin-dot {
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      background: transparent;
+      transition: background .15s, border-color .15s;
+    }
+    .pin-dot.filled {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+    .pin-dot.error {
+      background: var(--loss);
+      border-color: var(--loss);
+    }
+
+    .pin-keypad {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: .55rem;
+      max-width: 240px;
+      margin: 0 auto;
+    }
+    .pin-key {
+      aspect-ratio: 1;
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      background: var(--card);
+      font-size: 1.35rem;
+      font-weight: 600;
+      color: var(--text);
+      cursor: pointer;
+      transition: background .1s, transform .08s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+    }
+    .pin-key:hover  { background: var(--card2); }
+    .pin-key:active { transform: scale(.92); }
+    .pin-key.empty  { border: none; background: transparent; cursor: default; pointer-events: none; }
+    .pin-key.del    { font-size: 1rem; color: var(--text2); }
+
+    .pin-error {
+      margin-top: 1.25rem;
+      color: var(--loss);
+      font-size: .85rem;
+      min-height: 1.2em;
+    }
+  </style>
+</head>
+<body>
+
+<div class="pin-wrap">
+  <div class="pin-logo">🏀</div>
+  <div class="pin-title">Valcude Stats</div>
+  <div class="pin-subtitle">Introduce el PIN de acceso</div>
+
+  <div class="pin-display" id="pinDisplay">
+    <div class="pin-dot" id="d0"></div>
+    <div class="pin-dot" id="d1"></div>
+    <div class="pin-dot" id="d2"></div>
+    <div class="pin-dot" id="d3"></div>
+  </div>
+
+  <div class="pin-keypad">
+    <button class="pin-key" data-n="1">1</button>
+    <button class="pin-key" data-n="2">2</button>
+    <button class="pin-key" data-n="3">3</button>
+    <button class="pin-key" data-n="4">4</button>
+    <button class="pin-key" data-n="5">5</button>
+    <button class="pin-key" data-n="6">6</button>
+    <button class="pin-key" data-n="7">7</button>
+    <button class="pin-key" data-n="8">8</button>
+    <button class="pin-key" data-n="9">9</button>
+    <button class="pin-key empty"></button>
+    <button class="pin-key" data-n="0">0</button>
+    <button class="pin-key del" id="btnDel">⌫</button>
+  </div>
+
+  <div class="pin-error" id="pinError"></div>
+</div>
+
+<script type="module">
+import { verifyPin, setPinOk } from './js/pin.js'
+
+const PIN_LENGTH = 4
+let entered = ''
+
+function updateDots() {
+  for (let i = 0; i < PIN_LENGTH; i++) {
+    const dot = document.getElementById('d' + i)
+    dot.classList.toggle('filled', i < entered.length)
+    dot.classList.remove('error')
+  }
+}
+
+function shakeError() {
+  const dots = document.querySelectorAll('.pin-dot')
+  dots.forEach(d => d.classList.add('error'))
+  document.getElementById('pinError').textContent = 'PIN incorrecto'
+  setTimeout(() => {
+    dots.forEach(d => d.classList.remove('error'))
+    document.getElementById('pinError').textContent = ''
+    entered = ''
+    updateDots()
+  }, 900)
+}
+
+function pressKey(n) {
+  if (entered.length >= PIN_LENGTH) return
+  entered += n
+  updateDots()
+  if (entered.length === PIN_LENGTH) {
+    setTimeout(() => {
+      if (verifyPin(entered)) {
+        setPinOk()
+        location.replace('index.html')
+      } else {
+        shakeError()
+      }
+    }, 120)
+  }
+}
+
+document.querySelector('.pin-keypad').addEventListener('click', e => {
+  const key = e.target.closest('.pin-key')
+  if (!key) return
+  if (key.id === 'btnDel') {
+    entered = entered.slice(0, -1)
+    updateDots()
+    document.getElementById('pinError').textContent = ''
+    return
+  }
+  const n = key.dataset.n
+  if (n !== undefined) pressKey(n)
+})
+
+// Teclado físico
+document.addEventListener('keydown', e => {
+  if (e.key >= '0' && e.key <= '9') pressKey(e.key)
+  if (e.key === 'Backspace') {
+    entered = entered.slice(0, -1)
+    updateDots()
+  }
+})
+</script>
+</body>
+</html>

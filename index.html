@@ -16,7 +16,7 @@
     <a href="player.html">Jugadoras</a>
   </div>
   <div class="nav-spacer"></div>
-  <a id="nav-import" href="import.html" class="btn btn-primary" style="display:none">+ Importar</a>
+  <a href="import.html" class="btn btn-ghost" style="font-size:.8rem;padding:.3rem .7rem">Administrador</a>
 </nav>
 
 <div class="page">
@@ -83,7 +83,9 @@
 import { getMatches, getLeaderboard, getTeams } from './js/db.js'
 import { updateNavAuth } from './js/auth.js'
 import { fmt, titleCase } from './js/utils.js'
+import { requirePin } from './js/pin.js'
 
+requirePin()
 updateNavAuth()
 
 let allMatches    = []
@@ -238,7 +240,7 @@ document.getElementById('leaderTabs').addEventListener('click', e => {
 })
 
 document.getElementById('teamFilter').addEventListener('change', e => {
-  selectedTeamId = e.target.value || null
+  selectedTeamId = e.target.value ? Number(e.target.value) : null
   render()
 })
 
