@@ -162,12 +162,16 @@ async function processFiles(files) {
         continue
       }
 
-      // 5. Obtener fecha (opcional)
-      const matchDate = item.querySelector('.input-date')?.value || null
+      // 5. Leer jornada (editable) y fecha del preview ANTES de reemplazar el HTML
+      const jornadaVal = item.querySelector('.input-jornada')?.value
+      const jornada    = jornadaVal ? Number(jornadaVal) : parsed.jornada
+      const matchDate  = item.querySelector('.input-date')?.value || null
 
-      // 6. Importar
+      // 6. Importar — resetear item ANTES de setItemStatus (showPreview borró .queue-status)
+      item.innerHTML = `<div class="file-name">📄 ${parsed.sourceFile}</div>
+        <div class="queue-status"></div>`
       setItemStatus(item, 'loading', 'Importando…')
-      await importMatch(parsed, parsed.jornada, matchDate)
+      await importMatch(parsed, jornada, matchDate)
       setItemStatus(item, 'ok', `✓ Importado correctamente`)
 
     } catch (e) {
@@ -188,7 +192,13 @@ function addQueueItem(name) {
 }
 
 function setItemStatus(item, type, msg) {
-  const el = item.querySelector('.queue-status')
+  // showPreview reemplaza item.innerHTML; asegurarse de que .queue-status existe
+  let el = item.querySelector('.queue-status')
+  if (!el) {
+    const fn = item.querySelector('.file-name')?.outerHTML || ''
+    item.innerHTML = fn + '<div class="queue-status"></div>'
+    el = item.querySelector('.queue-status')
+  }
   el.className = `queue-status ${type === 'ok' ? 'ok' : type === 'error' ? 'err' : ''}`
   el.innerHTML = type === 'loading' ? `<div class="spinner" style="width:18px;height:18px;margin:0 auto"></div> ${msg}` : msg
 }
