@@ -20,12 +20,34 @@
 
     .sort-icon { font-size: .75em; }
 
-    /* ── Secondary stat (avg made/att) ─────────────── */
+    /* ── Secondary stat (percentage below fraction) ─ */
     td.num small {
       display: block;
-      font-size: .75rem;
+      font-size: .72rem;
       color: var(--text2);
       line-height: 1.2;
+    }
+
+    /* ── Chart panel ─────────────────────────────── */
+    .chart-panel {
+      margin-top: 1.5rem;
+    }
+    .chart-panel .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: .75rem 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .chart-panel .panel-header h2 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin: 0;
+    }
+    .chart-wrap {
+      padding: 1rem;
+      position: relative;
+      height: 420px;
     }
   </style>
 </head>
@@ -55,6 +77,7 @@
     </select>
   </div>
 
+  <!-- Tabla -->
   <div class="panel">
     <div class="table-wrap">
       <table id="rankTable">
@@ -78,24 +101,51 @@
       </table>
     </div>
   </div>
+
+  <!-- Gráfico -->
+  <div class="panel chart-panel">
+    <div class="panel-header">
+      <h2 id="chartTitle">Top jugadoras</h2>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="rankChart"></canvas>
+    </div>
+  </div>
+
 </div>
+
+<!-- Chart.js (UMD, antes del módulo) -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 
 <script type="module">
 import { getClient, getTeams } from './js/db.js'
-import { aggregateStats, fmt, titleCase } from './js/utils.js'
+import { aggregateStats, fmt, titleCase, shortName } from './js/utils.js'
 import { requirePin } from './js/pin.js'
 import { updateNavAuth } from './js/auth.js'
 
 requirePin()
 updateNavAuth()
 
+/* ── Metadatos por columna ────────────────────────────── */
+const COL_META = {
+  avg_pts:    { label: 'Puntos por partido',       scale: 1,   dec: 1 },
+  fg2_pct_n:  { label: '% Tiros de 2',             scale: 100, dec: 1 },
+  fg3_pct_n:  { label: '% Triples',                scale: 100, dec: 1 },
+  ft_pct_n:   { label: '% Tiros libres',           scale: 100, dec: 1 },
+  avg_fc:     { label: 'Faltas cometidas / partido', scale: 1, dec: 1 },
+  perMin_pts: { label: 'Puntos por minuto',         scale: 1,   dec: 3 },
+  games:      { label: 'Partidos jugados',          scale: 1,   dec: 0 },
+}
+
 let allPlayers    = []
 let allTeams      = []
 let selectedTeamId = null
 let sortCol        = 'avg_pts'
-let sortDir        = 'desc'   // 'asc' | 'desc'
+let sortDir        = 'desc'
+let chartCol       = 'avg_pts'   // columna activa del gráfico (solo numéricas)
+let chart          = null
 
-/* ── Carga datos desde Supabase ──────────────────────── */
+/* ── Carga datos ──────────────────────────────────────── */
 async function loadData() {
   const sb = getClient()
   let q = sb.from('player_stats').select(`
@@ -111,7 +161,6 @@ async function loadData() {
   const { data, error } = await q
   if (error) throw error
 
-  // Agrupar filas por jugadora
   const byPlayer = {}
   for (const r of data) {
     const pid = r.player_id
@@ -119,63 +168,58 @@ async function loadData() {
     byPlayer[pid].rows.push(r)
   }
 
-  // Agregar estadísticas
   allPlayers = Object.values(byPlayer)
     .map(p => {
       const s = aggregateStats(p.rows)
       const g = s.games
       return {
-        player:       p.player,
-        games:        g,
-        avg_pts:      s.avg_pts,
-        avg_min:      s.avg_min,
-        fg2_made:     s.fg2_made,
+        player:        p.player,
+        games:         g,
+        avg_pts:       s.avg_pts,
+        avg_min:       s.avg_min,
+        fg2_made:      s.fg2_made,
         fg2_attempted: s.fg2_attempted,
-        fg2_pct:      s.fg2_pct,
-        fg2_pct_n:    s.fg2_attempted ? s.fg2_made / s.fg2_attempted : null,
-        fg3_made:     s.fg3_made,
+        fg2_pct:       s.fg2_pct,
+        fg2_pct_n:     s.fg2_attempted ? s.fg2_made / s.fg2_attempted : null,
+        fg3_made:      s.fg3_made,
         fg3_attempted: s.fg3_attempted,
-        fg3_pct:      s.fg3_pct,
-        fg3_pct_n:    s.fg3_attempted ? s.fg3_made / s.fg3_attempted : null,
-        ft_made:      s.ft_made,
-        ft_attempted: s.ft_attempted,
-        ft_pct:       s.ft_pct,
-        ft_pct_n:     s.ft_attempted ? s.ft_made / s.ft_attempted : null,
-        avg_fc:       s.fouls_committed / g,
-        perMin_pts:   s.perMin_pts,
+        fg3_pct:       s.fg3_pct,
+        fg3_pct_n:     s.fg3_attempted ? s.fg3_made / s.fg3_attempted : null,
+        ft_made:       s.ft_made,
+        ft_attempted:  s.ft_attempted,
+        ft_pct:        s.ft_pct,
+        ft_pct_n:      s.ft_attempted ? s.ft_made / s.ft_attempted : null,
+        avg_fc:        s.fouls_committed / g,
+        perMin_pts:    s.perMin_pts,
       }
     })
     .filter(p => p.games > 0)
 }
 
 /* ── Render tabla ─────────────────────────────────────── */
-function renderTable() {
-  const sorted = [...allPlayers].sort((a, b) => {
-    let av = a[sortCol]
-    let bv = b[sortCol]
-
-    // Columnas de texto
+function sortedPlayers() {
+  return [...allPlayers].sort((a, b) => {
+    let av = a[sortCol], bv = b[sortCol]
     if (sortCol === 'name') { av = a.player?.name || ''; bv = b.player?.name || '' }
     if (sortCol === 'team') { av = a.player?.team?.name || ''; bv = b.player?.team?.name || '' }
-
     if (typeof av === 'string') {
       return sortDir === 'asc' ? av.localeCompare(bv, 'es') : bv.localeCompare(av, 'es')
     }
-
-    // Nulls al fondo
     if (av == null && bv == null) return 0
     if (av == null) return 1
     if (bv == null) return -1
     return sortDir === 'asc' ? av - bv : bv - av
   })
+}
+
+function renderTable() {
+  const sorted = sortedPlayers()
 
   const html = sorted.map((p, i) => {
-    const fg2AvgMade = fmt(p.fg2_made     / p.games, 1)
-    const fg2AvgAtt  = fmt(p.fg2_attempted / p.games, 1)
-    const fg3AvgMade = fmt(p.fg3_made     / p.games, 1)
-    const fg3AvgAtt  = fmt(p.fg3_attempted / p.games, 1)
-    const ftAvgMade  = fmt(p.ft_made      / p.games, 1)
-    const ftAvgAtt   = fmt(p.ft_attempted  / p.games, 1)
+    // Cifra grande: media por partido; % en pequeño
+    const fg2Frac = `${fmt(p.fg2_made / p.games, 1)}/${fmt(p.fg2_attempted / p.games, 1)}`
+    const fg3Frac = `${fmt(p.fg3_made  / p.games, 1)}/${fmt(p.fg3_attempted  / p.games, 1)}`
+    const ftFrac  = `${fmt(p.ft_made   / p.games, 1)}/${fmt(p.ft_attempted   / p.games, 1)}`
 
     return `<tr>
       <td class="rank">${i + 1}</td>
@@ -183,9 +227,9 @@ function renderTable() {
       <td class="team-name hide-mobile">${titleCase(p.player.team?.name || '')}</td>
       <td class="num hide-tablet">${p.games}</td>
       <td class="num highlight"><strong>${fmt(p.avg_pts, 1)}</strong></td>
-      <td class="num hide-tablet">${p.fg2_pct}<small>${fg2AvgMade}/${fg2AvgAtt}</small></td>
-      <td class="num hide-tablet">${p.fg3_pct}<small>${fg3AvgMade}/${fg3AvgAtt}</small></td>
-      <td class="num hide-tablet">${p.ft_pct}<small>${ftAvgMade}/${ftAvgAtt}</small></td>
+      <td class="num hide-tablet"><strong>${fg2Frac}</strong><small>${p.fg2_pct}</small></td>
+      <td class="num hide-tablet"><strong>${fg3Frac}</strong><small>${p.fg3_pct}</small></td>
+      <td class="num hide-tablet"><strong>${ftFrac}</strong><small>${p.ft_pct}</small></td>
       <td class="num hide-mobile">${fmt(p.avg_fc, 1)}</td>
       <td class="num">${p.perMin_pts != null ? fmt(p.perMin_pts, 3) : '—'}</td>
     </tr>`
@@ -194,7 +238,7 @@ function renderTable() {
   document.getElementById('rankBody').innerHTML =
     html || '<tr><td colspan="10" class="empty">Sin datos</td></tr>'
 
-  // Actualizar indicadores de ordenación
+  // Indicadores de ordenación
   document.querySelectorAll('#rankTable th.sortable').forEach(th => {
     const col = th.dataset.col
     th.classList.remove('sort-asc', 'sort-desc', 'sort-none')
@@ -210,6 +254,91 @@ function renderTable() {
     : 'Todos los equipos'
   document.getElementById('subtitle').textContent =
     `${teamName} · ${allPlayers.length} jugadora${allPlayers.length !== 1 ? 's' : ''}`
+
+  renderChart()
+}
+
+/* ── Render gráfico ───────────────────────────────────── */
+function renderChart() {
+  const meta = COL_META[chartCol]
+  if (!meta || !allPlayers.length) return
+
+  // Top 15 desc por chartCol
+  const top = [...allPlayers]
+    .filter(p => p[chartCol] != null)
+    .sort((a, b) => (b[chartCol] || 0) - (a[chartCol] || 0))
+    .slice(0, 15)
+
+  const labels = top.map(p => shortName(p.player.name))
+  const values = top.map(p => {
+    const v = p[chartCol] * meta.scale
+    return parseFloat(v.toFixed(meta.dec))
+  })
+
+  // Colores del tema
+  const style  = getComputedStyle(document.documentElement)
+  const accent = style.getPropertyValue('--accent').trim() || '#16a34a'
+  const text2  = style.getPropertyValue('--text2').trim()  || '#6b7280'
+  const border = style.getPropertyValue('--border').trim() || '#374151'
+
+  document.getElementById('chartTitle').textContent = meta.label
+
+  const ctx = document.getElementById('rankChart').getContext('2d')
+
+  if (chart) {
+    chart.data.labels              = labels
+    chart.data.datasets[0].data   = values
+    chart.data.datasets[0].label  = meta.label
+    chart.options.scales.x.ticks.callback = v =>
+      meta.scale === 100 ? v.toFixed(meta.dec) + '%' : v.toFixed(meta.dec)
+    chart.update('active')
+  } else {
+    chart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: meta.label,
+          data: values,
+          backgroundColor: accent + 'bb',
+          borderColor: accent,
+          borderWidth: 1,
+          borderRadius: 4,
+          borderSkipped: false,
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => {
+                const v = ctx.parsed.x
+                return ' ' + (meta.scale === 100 ? v.toFixed(meta.dec) + '%' : v.toFixed(meta.dec))
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            beginAtZero: true,
+            grid:  { color: border },
+            ticks: {
+              color: text2,
+              callback: v => meta.scale === 100 ? v.toFixed(meta.dec) + '%' : v.toFixed(meta.dec)
+            }
+          },
+          y: {
+            grid:  { display: false },
+            ticks: { color: text2, font: { size: 12 } }
+          }
+        }
+      }
+    })
+  }
 }
 
 /* ── Init ─────────────────────────────────────────────── */
@@ -229,7 +358,6 @@ async function init() {
 }
 
 /* ── Eventos ──────────────────────────────────────────── */
-// Click en cabecera de columna → ordenar
 document.getElementById('rankTable').addEventListener('click', e => {
   const th = e.target.closest('th.sortable')
   if (!th) return
@@ -238,13 +366,12 @@ document.getElementById('rankTable').addEventListener('click', e => {
     sortDir = sortDir === 'desc' ? 'asc' : 'desc'
   } else {
     sortCol = col
-    // Texto → ascendente por defecto; números → descendente
     sortDir = (col === 'name' || col === 'team') ? 'asc' : 'desc'
+    if (COL_META[col]) chartCol = col   // actualizar gráfico solo en columnas numéricas
   }
   renderTable()
 })
 
-// Selector de equipo
 document.getElementById('teamFilter').addEventListener('change', async e => {
   selectedTeamId = e.target.value ? Number(e.target.value) : null
   document.getElementById('rankBody').innerHTML =
