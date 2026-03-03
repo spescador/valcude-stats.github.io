@@ -217,8 +217,8 @@ function renderTable() {
 
   const html = sorted.map((p, i) => {
     // TC2/TC3: totales sin decimales ni %; TL: totales + porcentaje
-    const fg2Str = `${p.fg2_made}/${p.fg2_attempted}`
-    const fg3Str = `${p.fg3_made}/${p.fg3_attempted}`
+    const fg2Str = `${p.fg2_made}`
+    const fg3Str = `${p.fg3_made}`
     const ftStr  = `${p.ft_made}/${p.ft_attempted}`
 
     return `<tr>
