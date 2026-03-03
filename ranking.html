@@ -216,10 +216,10 @@ function renderTable() {
   const sorted = sortedPlayers()
 
   const html = sorted.map((p, i) => {
-    // Cifra grande: media por partido; % en pequeño
-    const fg2Frac = `${fmt(p.fg2_made / p.games, 1)}/${fmt(p.fg2_attempted / p.games, 1)}`
-    const fg3Frac = `${fmt(p.fg3_made  / p.games, 1)}/${fmt(p.fg3_attempted  / p.games, 1)}`
-    const ftFrac  = `${fmt(p.ft_made   / p.games, 1)}/${fmt(p.ft_attempted   / p.games, 1)}`
+    // TC2/TC3: totales sin decimales ni %; TL: totales + porcentaje
+    const fg2Str = `${p.fg2_made}/${p.fg2_attempted}`
+    const fg3Str = `${p.fg3_made}/${p.fg3_attempted}`
+    const ftStr  = `${p.ft_made}/${p.ft_attempted}`
 
     return `<tr>
       <td class="rank">${i + 1}</td>
@@ -227,9 +227,9 @@ function renderTable() {
       <td class="team-name hide-mobile">${titleCase(p.player.team?.name || '')}</td>
       <td class="num hide-tablet">${p.games}</td>
       <td class="num highlight"><strong>${fmt(p.avg_pts, 1)}</strong></td>
-      <td class="num hide-tablet"><strong>${fg2Frac}</strong><small>${p.fg2_pct}</small></td>
-      <td class="num hide-tablet"><strong>${fg3Frac}</strong><small>${p.fg3_pct}</small></td>
-      <td class="num hide-tablet"><strong>${ftFrac}</strong><small>${p.ft_pct}</small></td>
+      <td class="num hide-tablet"><strong>${fg2Str}</strong></td>
+      <td class="num hide-tablet"><strong>${fg3Str}</strong></td>
+      <td class="num hide-tablet"><strong>${ftStr}</strong><small>${p.ft_pct}</small></td>
       <td class="num hide-mobile">${fmt(p.avg_fc, 1)}</td>
       <td class="num">${p.perMin_pts != null ? fmt(p.perMin_pts, 3) : '—'}</td>
     </tr>`
