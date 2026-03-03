@@ -88,8 +88,8 @@
             <th class="sortable sort-none hide-mobile" data-col="team">Equipo<span class="sort-icon"></span></th>
             <th class="sortable sort-none num hide-tablet" data-col="games">PJ<span class="sort-icon"></span></th>
             <th class="sortable sort-desc num" data-col="avg_pts">PTS<span class="sort-icon"></span></th>
-            <th class="sortable sort-none num hide-tablet" data-col="fg2_pct_n">TC2<span class="sort-icon"></span></th>
-            <th class="sortable sort-none num hide-tablet" data-col="fg3_pct_n">TC3<span class="sort-icon"></span></th>
+            <th class="sortable sort-none num hide-tablet" data-col="fg2_made">TC2<span class="sort-icon"></span></th>
+            <th class="sortable sort-none num hide-tablet" data-col="fg3_made">TC3<span class="sort-icon"></span></th>
             <th class="sortable sort-none num hide-tablet" data-col="ft_pct_n">TL<span class="sort-icon"></span></th>
             <th class="sortable sort-none num hide-mobile" data-col="avg_fc">FC<span class="sort-icon"></span></th>
             <th class="sortable sort-none num" data-col="perMin_pts">Pts/min<span class="sort-icon"></span></th>
@@ -102,14 +102,27 @@
     </div>
   </div>
 
-  <!-- Gráfico -->
-  <div class="panel chart-panel">
-    <div class="panel-header">
-      <h2 id="chartTitle">Top jugadoras</h2>
+  <!-- Gráficos -->
+  <div class="two-col" style="margin-top:1.5rem">
+
+    <div class="panel chart-panel" style="margin-top:0">
+      <div class="panel-header">
+        <h2 id="chartTitle">Top jugadoras</h2>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="rankChart"></canvas>
+      </div>
     </div>
-    <div class="chart-wrap">
-      <canvas id="rankChart"></canvas>
+
+    <div class="panel chart-panel" style="margin-top:0">
+      <div class="panel-header">
+        <h2>Puntos por minuto</h2>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="ppmChart"></canvas>
+      </div>
     </div>
+
   </div>
 
 </div>
@@ -128,11 +141,13 @@ updateNavAuth()
 
 /* ── Metadatos por columna ────────────────────────────── */
 const COL_META = {
-  avg_pts:    { label: 'Puntos por partido',       scale: 1,   dec: 1 },
+  avg_pts:    { label: 'Puntos por partido',        scale: 1,   dec: 1 },
+  fg2_made:   { label: 'Canastas de 2 anotadas',   scale: 1,   dec: 0 },
+  fg3_made:   { label: 'Triples anotados',          scale: 1,   dec: 0 },
   fg2_pct_n:  { label: '% Tiros de 2',             scale: 100, dec: 1 },
   fg3_pct_n:  { label: '% Triples',                scale: 100, dec: 1 },
   ft_pct_n:   { label: '% Tiros libres',           scale: 100, dec: 1 },
-  avg_fc:     { label: 'Faltas cometidas / partido', scale: 1, dec: 1 },
+  avg_fc:     { label: 'Faltas cometidas / partido', scale: 1,  dec: 1 },
   perMin_pts: { label: 'Puntos por minuto',         scale: 1,   dec: 3 },
   games:      { label: 'Partidos jugados',          scale: 1,   dec: 0 },
 }
@@ -144,6 +159,7 @@ let sortCol        = 'avg_pts'
 let sortDir        = 'desc'
 let chartCol       = 'avg_pts'   // columna activa del gráfico (solo numéricas)
 let chart          = null
+let chartPpm       = null
 
 /* ── Carga datos ──────────────────────────────────────── */
 async function loadData() {
@@ -256,88 +272,101 @@ function renderTable() {
     `${teamName} · ${allPlayers.length} jugadora${allPlayers.length !== 1 ? 's' : ''}`
 
   renderChart()
+  renderPpmChart()
 }
 
-/* ── Render gráfico ───────────────────────────────────── */
-function renderChart() {
-  const meta = COL_META[chartCol]
-  if (!meta || !allPlayers.length) return
-
-  // Top 15 desc por chartCol
-  const top = [...allPlayers]
-    .filter(p => p[chartCol] != null)
-    .sort((a, b) => (b[chartCol] || 0) - (a[chartCol] || 0))
-    .slice(0, 15)
-
-  const labels = top.map(p => shortName(p.player.name))
-  const values = top.map(p => {
-    const v = p[chartCol] * meta.scale
-    return parseFloat(v.toFixed(meta.dec))
-  })
-
-  // Colores del tema
+/* ── Helper: construir gráfico de barras horizontal ────── */
+function buildBarChart(canvasId, labels, values, label, tickFmt) {
   const style  = getComputedStyle(document.documentElement)
   const accent = style.getPropertyValue('--accent').trim() || '#16a34a'
   const text2  = style.getPropertyValue('--text2').trim()  || '#6b7280'
   const border = style.getPropertyValue('--border').trim() || '#374151'
 
-  document.getElementById('chartTitle').textContent = meta.label
-
-  const ctx = document.getElementById('rankChart').getContext('2d')
-
-  if (chart) {
-    chart.data.labels              = labels
-    chart.data.datasets[0].data   = values
-    chart.data.datasets[0].label  = meta.label
-    chart.options.scales.x.ticks.callback = v =>
-      meta.scale === 100 ? v.toFixed(meta.dec) + '%' : v.toFixed(meta.dec)
-    chart.update('active')
-  } else {
-    chart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels,
-        datasets: [{
-          label: meta.label,
-          data: values,
-          backgroundColor: accent + 'bb',
-          borderColor: accent,
-          borderWidth: 1,
-          borderRadius: 4,
-          borderSkipped: false,
-        }]
+  const ctx = document.getElementById(canvasId).getContext('2d')
+  return new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label,
+        data: values,
+        backgroundColor: accent + 'bb',
+        borderColor: accent,
+        borderWidth: 1,
+        borderRadius: 4,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ' ' + tickFmt(ctx.parsed.x) } }
       },
-      options: {
-        indexAxis: 'y',
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: ctx => {
-                const v = ctx.parsed.x
-                return ' ' + (meta.scale === 100 ? v.toFixed(meta.dec) + '%' : v.toFixed(meta.dec))
-              }
-            }
-          }
+      scales: {
+        x: {
+          beginAtZero: true,
+          grid:  { color: border },
+          ticks: { color: text2, callback: tickFmt }
         },
-        scales: {
-          x: {
-            beginAtZero: true,
-            grid:  { color: border },
-            ticks: {
-              color: text2,
-              callback: v => meta.scale === 100 ? v.toFixed(meta.dec) + '%' : v.toFixed(meta.dec)
-            }
-          },
-          y: {
-            grid:  { display: false },
-            ticks: { color: text2, font: { size: 12 } }
-          }
+        y: {
+          grid:  { display: false },
+          ticks: { color: text2, font: { size: 12 } }
         }
       }
-    })
+    }
+  })
+}
+
+/* ── Render gráfico (columna activa) ─────────────────── */
+function renderChart() {
+  const meta = COL_META[chartCol]
+  if (!meta || !allPlayers.length) return
+
+  const top = [...allPlayers]
+    .filter(p => p[chartCol] != null)
+    .sort((a, b) => (b[chartCol] || 0) - (a[chartCol] || 0))
+    .slice(0, 15)
+
+  const labels  = top.map(p => shortName(p.player.name))
+  const values  = top.map(p => parseFloat((p[chartCol] * meta.scale).toFixed(meta.dec)))
+  const tickFmt = v => meta.scale === 100 ? Number(v).toFixed(meta.dec) + '%' : Number(v).toFixed(meta.dec)
+
+  document.getElementById('chartTitle').textContent = meta.label
+
+  if (chart) {
+    chart.data.labels            = labels
+    chart.data.datasets[0].data  = values
+    chart.data.datasets[0].label = meta.label
+    chart.options.scales.x.ticks.callback = tickFmt
+    chart.options.plugins.tooltip.callbacks.label = ctx => ' ' + tickFmt(ctx.parsed.x)
+    chart.update('active')
+  } else {
+    chart = buildBarChart('rankChart', labels, values, meta.label, tickFmt)
+  }
+}
+
+/* ── Render gráfico fijo: Pts/min ────────────────────── */
+function renderPpmChart() {
+  if (!allPlayers.length) return
+
+  const top = [...allPlayers]
+    .filter(p => p.perMin_pts != null)
+    .sort((a, b) => (b.perMin_pts || 0) - (a.perMin_pts || 0))
+    .slice(0, 15)
+
+  const labels  = top.map(p => shortName(p.player.name))
+  const values  = top.map(p => parseFloat(p.perMin_pts.toFixed(3)))
+  const tickFmt = v => Number(v).toFixed(3)
+
+  if (chartPpm) {
+    chartPpm.data.labels           = labels
+    chartPpm.data.datasets[0].data = values
+    chartPpm.update('active')
+  } else {
+    chartPpm = buildBarChart('ppmChart', labels, values, 'Puntos por minuto', tickFmt)
   }
 }
 
