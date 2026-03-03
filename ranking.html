@@ -4,6 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Rankings · Valcude Stats</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#16a34a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Valcude Stats">
+  <link rel="apple-touch-icon" href="icons/icon.svg">
   <link rel="stylesheet" href="css/style.css">
   <style>
     /* ── Sortable headers ─────────────────────────── */
@@ -88,8 +95,8 @@
             <th class="sortable sort-none hide-mobile" data-col="team">Equipo<span class="sort-icon"></span></th>
             <th class="sortable sort-none num hide-tablet" data-col="games">PJ<span class="sort-icon"></span></th>
             <th class="sortable sort-desc num" data-col="avg_pts">PTS<span class="sort-icon"></span></th>
-            <th class="sortable sort-none num hide-tablet" data-col="fg2_made">TC2<span class="sort-icon"></span></th>
-            <th class="sortable sort-none num hide-tablet" data-col="fg3_made">TC3<span class="sort-icon"></span></th>
+            <th class="sortable sort-none num hide-tablet" data-col="avg_fg2">TC2<span class="sort-icon"></span></th>
+            <th class="sortable sort-none num hide-tablet" data-col="avg_fg3">TC3<span class="sort-icon"></span></th>
             <th class="sortable sort-none num hide-tablet" data-col="ft_pct_n">TL<span class="sort-icon"></span></th>
             <th class="sortable sort-none num hide-mobile" data-col="avg_fc">FC<span class="sort-icon"></span></th>
             <th class="sortable sort-none num" data-col="perMin_pts">Pts/min<span class="sort-icon"></span></th>
@@ -142,8 +149,10 @@ updateNavAuth()
 /* ── Metadatos por columna ────────────────────────────── */
 const COL_META = {
   avg_pts:    { label: 'Puntos por partido',        scale: 1,   dec: 1 },
-  fg2_made:   { label: 'Canastas de 2 anotadas',   scale: 1,   dec: 0 },
-  fg3_made:   { label: 'Triples anotados',          scale: 1,   dec: 0 },
+  avg_fg2:    { label: 'Canastas de 2 por partido',  scale: 1,   dec: 1 },
+  avg_fg3:    { label: 'Triples por partido',        scale: 1,   dec: 1 },
+  fg2_made:   { label: 'Canastas de 2 anotadas',    scale: 1,   dec: 0 },
+  fg3_made:   { label: 'Triples anotados',           scale: 1,   dec: 0 },
   fg2_pct_n:  { label: '% Tiros de 2',             scale: 100, dec: 1 },
   fg3_pct_n:  { label: '% Triples',                scale: 100, dec: 1 },
   ft_pct_n:   { label: '% Tiros libres',           scale: 100, dec: 1 },
@@ -195,10 +204,12 @@ async function loadData() {
         avg_min:       s.avg_min,
         fg2_made:      s.fg2_made,
         fg2_attempted: s.fg2_attempted,
+        avg_fg2:       s.fg2_made / g,
         fg2_pct:       s.fg2_pct,
         fg2_pct_n:     s.fg2_attempted ? s.fg2_made / s.fg2_attempted : null,
         fg3_made:      s.fg3_made,
         fg3_attempted: s.fg3_attempted,
+        avg_fg3:       s.fg3_made / g,
         fg3_pct:       s.fg3_pct,
         fg3_pct_n:     s.fg3_attempted ? s.fg3_made / s.fg3_attempted : null,
         ft_made:       s.ft_made,
@@ -410,6 +421,11 @@ document.getElementById('teamFilter').addEventListener('change', async e => {
 })
 
 init().catch(console.error)
+</script>
+<script>
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("./sw.js").catch(() => {})
+  }
 </script>
 </body>
 </html>

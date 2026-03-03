@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Fondo con esquinas redondeadas -->
+  <rect width="512" height="512" rx="96" fill="#16a34a"/>
+
+  <!-- Pelota de baloncesto -->
+  <circle cx="256" cy="210" r="130" fill="none" stroke="white" stroke-width="14"/>
+  <!-- Línea ecuatorial -->
+  <line x1="126" y1="210" x2="386" y2="210" stroke="white" stroke-width="14"/>
+  <!-- Curvas laterales izquierda -->
+  <path d="M 256 80 Q 185 145 185 210 Q 185 275 256 340"
+        fill="none" stroke="white" stroke-width="14"/>
+  <!-- Curvas laterales derecha -->
+  <path d="M 256 80 Q 327 145 327 210 Q 327 275 256 340"
+        fill="none" stroke="white" stroke-width="14"/>
+
+  <!-- Texto Stats -->
+  <text x="256" y="418"
+        text-anchor="middle"
+        font-family="system-ui, -apple-system, sans-serif"
+        font-size="88" font-weight="800"
+        fill="white" letter-spacing="-2">Stats</text>
+</svg>
