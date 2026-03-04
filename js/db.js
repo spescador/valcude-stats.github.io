@@ -92,7 +92,7 @@ export async function getLeaderboard({ teamId, competitionId } = {}) {
     blocks_made, valuation, plus_minus,
     player:player_id (id, name, team:team_id (id, name)),
     match:match_id (competition_id)
-  `)
+  `).limit(5000)
 
   if (teamId) q = q.eq('team_id', teamId)
 

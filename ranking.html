@@ -120,6 +120,9 @@
   </div>
 
   <div class="filters">
+    <select id="compFilter">
+      <option value="">Todas las competiciones</option>
+    </select>
     <select id="teamFilter">
       <option value="">Todos los equipos</option>
     </select>
@@ -146,8 +149,8 @@
             <th class="sortable sort-none hide-mobile" data-col="team">Equipo<span class="sort-icon"></span></th>
             <th class="sortable sort-none num v-pts" data-col="games">PJ<span class="sort-icon"></span></th>
             <th class="sortable sort-desc num v-pts" data-col="avg_pts">PTS<span class="sort-icon"></span></th>
-            <th class="sortable sort-none num v-tiro" data-col="avg_fg2">TC2<span class="sort-icon"></span></th>
-            <th class="sortable sort-none num v-tiro" data-col="avg_fg3">TC3<span class="sort-icon"></span></th>
+            <th class="sortable sort-none num v-tiro" data-col="fg2_made">TC2<span class="sort-icon"></span></th>
+            <th class="sortable sort-none num v-tiro" data-col="fg3_made">TC3<span class="sort-icon"></span></th>
             <th class="sortable sort-none num v-tiro" data-col="ft_made">TL<span class="sort-icon"></span></th>
             <th class="sortable sort-none num v-tiro" data-col="ft_pct_n">%TL<span class="sort-icon"></span></th>
             <th class="sortable sort-none num v-pts hide-mobile" data-col="avg_fc">FC<span class="sort-icon"></span></th>
@@ -199,7 +202,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 
 <script type="module">
-import { getClient, getTeams } from './js/db.js'
+import { getClient, getTeams, getCompetitions } from './js/db.js'
 import { aggregateStats, fmt, titleCase, shortName } from './js/utils.js'
 import { requirePin } from './js/pin.js'
 import { updateNavAuth } from './js/auth.js'
@@ -222,9 +225,11 @@ const COL_META = {
   games:      { label: 'Partidos jugados',          scale: 1,   dec: 0 },
 }
 
-let allPlayers     = []
-let allTeams       = []
-let selectedTeamId  = null
+let allPlayers       = []
+let allTeams         = []
+let allCompetitions  = []
+let selectedCompId   = null
+let selectedTeamId   = null
 let selectedPlayerId = null
 let sortCol        = 'avg_pts'
 let sortDir        = 'desc'
@@ -242,15 +247,21 @@ async function loadData() {
     fg3_made, fg3_attempted,
     ft_made,  ft_attempted,
     fouls_committed,
-    player:player_id (id, name, team:team_id (id, name))
-  `)
+    player:player_id (id, name, team:team_id (id, name)),
+    match:match_id (competition_id)
+  `).limit(5000)
   if (selectedTeamId) q = q.eq('team_id', selectedTeamId)
 
   const { data, error } = await q
   if (error) throw error
 
+  // Filtrar por competición si se ha seleccionado
+  const rows = selectedCompId
+    ? data.filter(r => r.match?.competition_id === selectedCompId)
+    : data
+
   const byPlayer = {}
-  for (const r of data) {
+  for (const r of rows) {
     const pid = r.player_id
     if (!byPlayer[pid]) byPlayer[pid] = { player: r.player, rows: [] }
     byPlayer[pid].rows.push(r)
@@ -360,11 +371,14 @@ function renderTable() {
   })
 
   // Subtítulo
+  const compName = selectedCompId
+    ? (allCompetitions.find(c => c.id === selectedCompId)?.name || '')
+    : 'Todas las competiciones'
   const teamName = selectedTeamId
     ? titleCase(allTeams.find(t => t.id === selectedTeamId)?.name || '')
     : 'Todos los equipos'
   document.getElementById('subtitle').textContent =
-    `${teamName} · ${sorted.length} jugadora${sorted.length !== 1 ? 's' : ''}`
+    `${compName} · ${teamName} · ${sorted.length} jugadora${sorted.length !== 1 ? 's' : ''}`
 
   renderChart()
   renderPpmChart()
@@ -490,14 +504,22 @@ function renderFg3Chart() {
 
 /* ── Init ─────────────────────────────────────────────── */
 async function init() {
-  allTeams = await getTeams()
+  ;[allTeams, allCompetitions] = await Promise.all([getTeams(), getCompetitions()])
 
-  const sel = document.getElementById('teamFilter')
+  const compSel = document.getElementById('compFilter')
+  for (const c of allCompetitions) {
+    const opt = document.createElement('option')
+    opt.value = c.id
+    opt.textContent = `${c.name} ${c.season}`
+    compSel.appendChild(opt)
+  }
+
+  const teamSel = document.getElementById('teamFilter')
   for (const t of allTeams) {
     const opt = document.createElement('option')
     opt.value = t.id
     opt.textContent = titleCase(t.name)
-    sel.appendChild(opt)
+    teamSel.appendChild(opt)
   }
 
   await loadData()
@@ -526,6 +548,15 @@ document.getElementById('rankTable').addEventListener('click', e => {
     sortDir = (col === 'name' || col === 'team') ? 'asc' : 'desc'
     if (COL_META[col]) chartCol = col   // actualizar gráfico solo en columnas numéricas
   }
+  renderTable()
+})
+
+document.getElementById('compFilter').addEventListener('change', async e => {
+  selectedCompId = e.target.value ? Number(e.target.value) : null
+  document.getElementById('rankBody').innerHTML =
+    '<tr><td colspan="11" class="loading"><div class="spinner"></div></td></tr>'
+  await loadData()
+  populatePlayerFilter()
   renderTable()
 })
 
