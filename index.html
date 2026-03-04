@@ -52,7 +52,7 @@
     <div class="stat-card"><div class="label">Partidos</div><div class="value" id="c-games">—</div></div>
     <div class="stat-card"><div class="label">Victorias</div><div class="value result-win" id="c-wins">—</div><div class="sub" id="c-record"></div></div>
     <div class="stat-card"><div class="label">Pts/partido</div><div class="value" id="c-ppg">—</div></div>
-    <div class="stat-card"><div class="label">Val/partido</div><div class="value" id="c-vpg">—</div></div>
+    <div class="stat-card"><div class="label">PC/partido</div><div class="value" id="c-vpg">—</div></div>
   </div>
 
   <div class="two-col">
@@ -159,14 +159,15 @@ function render() {
   const leaders = filteredLeaderboard()
 
   // Summary cards
-  let wins = 0, totalPts = 0
+  let wins = 0, totalPts = 0, totalAgainst = 0
   for (const m of matches) {
     if (selectedTeamId) {
       const isT1  = m.team1?.id === selectedTeamId
       const myPts = isT1 ? m.team1_score : m.team2_score
       const thPts = isT1 ? m.team2_score : m.team1_score
       if (myPts > thPts) wins++
-      totalPts += myPts || 0
+      totalPts     += myPts || 0
+      totalAgainst += thPts || 0
     }
   }
 
@@ -186,11 +187,11 @@ function render() {
     ? fmt(totalPts / matches.length, 1)
     : '—'
 
-  // Val/partido = media de avg_val de jugadoras del equipo
-  const avgVal = leaders.length
-    ? leaders.reduce((s, p) => s + (p.avg_val || 0), 0) / leaders.length
+  // PC/partido = puntos encajados por partido
+  const avgAgainst = selectedTeamId && matches.length
+    ? totalAgainst / matches.length
     : null
-  document.getElementById('c-vpg').textContent = avgVal != null ? fmt(avgVal, 1) : '—'
+  document.getElementById('c-vpg').textContent = avgAgainst != null ? fmt(avgAgainst, 1) : '—'
 
   renderLeader(leaders)
   renderMatches(matches)

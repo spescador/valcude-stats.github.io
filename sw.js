@@ -3,7 +3,7 @@
 // Estrategia: cache-first para estáticos, network-only para API
 // ================================================================
 
-const CACHE_NAME = 'valcude-v3'
+const CACHE_NAME = 'valcude-v4'
 
 const STATIC_ASSETS = [
   './',

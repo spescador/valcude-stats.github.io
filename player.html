@@ -183,10 +183,10 @@ async function init() {
           <tbody>
             ${stats.map(s => {
               const m        = s.match
-              const isV1     = m?.team1?.name?.includes('VALCUDE')
-              const myScore  = isV1 ? m?.team1_score : m?.team2_score
-              const thScore  = isV1 ? m?.team2_score : m?.team1_score
-              const rival    = isV1 ? m?.team2?.name : m?.team1?.name
+              const isMyT1   = m?.team1?.id === s.team_id
+              const myScore  = isMyT1 ? m?.team1_score : m?.team2_score
+              const thScore  = isMyT1 ? m?.team2_score : m?.team1_score
+              const rival    = isMyT1 ? m?.team2?.name : m?.team1?.name
               const won      = myScore > thScore
               const min      = Number(s.minutes)
               const hasMin   = min > 0.5
