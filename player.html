@@ -102,13 +102,20 @@ async function init() {
   let ranks = {}
   try {
     const lb = await getLeaderboard()
-    for (const metric of ['avg_pts', 'avg_val', 'avg_min', 'perMin_pts']) {
+    const rankBy = fn => {
       const sorted = [...lb]
-        .filter(p => p[metric] != null)
-        .sort((a, b) => (b[metric] || 0) - (a[metric] || 0))
+        .filter(p => fn(p) != null && fn(p) > 0)
+        .sort((a, b) => (fn(b) || 0) - (fn(a) || 0))
       const pos = sorted.findIndex(p => p.player?.id === Number(playerId))
-      if (pos >= 0) ranks[metric] = pos + 1
+      return pos >= 0 ? pos + 1 : undefined
     }
+    ranks.avg_pts    = rankBy(p => p.avg_pts)
+    ranks.avg_val    = rankBy(p => p.avg_val)
+    ranks.avg_min    = rankBy(p => p.avg_min)
+    ranks.perMin_pts = rankBy(p => p.perMin_pts)
+    ranks.fg2_made   = rankBy(p => p.fg2_made)
+    ranks.fg3_made   = rankBy(p => p.fg3_made)
+    ranks.ft_pct     = rankBy(p => p.ft_attempted > 0 ? p.ft_made / p.ft_attempted : null)
   } catch (_) {}
 
   const lastJersey = stats[stats.length - 1]?.jersey_number || '—'
@@ -133,14 +140,14 @@ async function init() {
       ${avgCard('+/-', (agg.avg_pm > 0 ? '+' : '') + fmt(agg.avg_pm, 1), '')}
     </div>
 
-    <!-- Porcentajes de tiro -->
+    <!-- Anotación -->
     <div class="panel" style="margin-bottom:1.25rem">
-      <div class="panel-header"><h2>Porcentajes de tiro</h2></div>
+      <div class="panel-header"><h2>Anotación</h2></div>
       <div class="panel-body">
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;text-align:center">
-          ${shootingCard('TC2', agg.fg2_made, agg.fg2_attempted, agg.fg2_pct)}
-          ${shootingCard('TC3', agg.fg3_made, agg.fg3_attempted, agg.fg3_pct)}
-          ${shootingCard('TL',  agg.ft_made,  agg.ft_attempted,  agg.ft_pct)}
+          ${shootingCard('TC2', agg.fg2_made,  null, ranks.fg2_made)}
+          ${shootingCard('TC3', agg.fg3_made,  null, ranks.fg3_made)}
+          ${shootingCard('TL',  agg.ft_pct,    `${agg.ft_made}/${agg.ft_attempted}`, ranks.ft_pct)}
         </div>
       </div>
     </div>
@@ -234,10 +241,11 @@ function avgCard(label, main, sub, rank) {
   </div>`
 }
 
-function shootingCard(label, made, attempted, pct) {
+function shootingCard(label, bigVal, sub, rank) {
   return `<div>
-    <div style="font-size:1.5rem;font-weight:700">${pct || '—'}</div>
-    <div style="color:var(--text2);font-size:.8rem;margin-top:.2rem">${label} · ${made}/${attempted}</div>
+    <div style="font-size:1.5rem;font-weight:700">${bigVal ?? '—'}</div>
+    ${rank != null ? `<div class="rank-pos" style="text-align:center">#${rank}</div>` : ''}
+    <div style="color:var(--text2);font-size:.8rem;margin-top:.3rem">${label}${sub ? ' · ' + sub : ''}</div>
   </div>`
 }
 
