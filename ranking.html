@@ -236,21 +236,29 @@ let chartFg3       = null
 /* ── Carga datos ──────────────────────────────────────── */
 async function loadData() {
   const sb = getClient()
-  let q = sb.from('player_stats').select(`
-    player_id, team_id, minutes, points,
-    fg2_made, fg2_attempted,
-    fg3_made, fg3_attempted,
-    ft_made,  ft_attempted,
-    fouls_committed,
-    player:player_id (id, name, team:team_id (id, name))
-  `).limit(5000)
-  if (selectedTeamId) q = q.eq('team_id', selectedTeamId)
-
-  const { data, error } = await q
-  if (error) throw error
+  // Paginación: PostgREST tiene max 1000 filas por petición en el tier free
+  const PAGE = 1000
+  let allData = []
+  let from = 0
+  while (true) {
+    let q = sb.from('player_stats').select(`
+      player_id, team_id, minutes, points,
+      fg2_made, fg2_attempted,
+      fg3_made, fg3_attempted,
+      ft_made,  ft_attempted,
+      fouls_committed,
+      player:player_id (id, name, team:team_id (id, name))
+    `).range(from, from + PAGE - 1)
+    if (selectedTeamId) q = q.eq('team_id', selectedTeamId)
+    const { data, error } = await q
+    if (error) throw error
+    allData = allData.concat(data)
+    if (data.length < PAGE) break
+    from += PAGE
+  }
 
   const byPlayer = {}
-  for (const r of data) {
+  for (const r of allData) {
     const pid = r.player_id
     if (!byPlayer[pid]) byPlayer[pid] = { player: r.player, rows: [] }
     byPlayer[pid].rows.push(r)

@@ -83,26 +83,33 @@ export async function getPlayerFull(id) {
  */
 export async function getLeaderboard({ teamId, competitionId } = {}) {
   const sb = getClient()
-  let q = sb.from('player_stats').select(`
-    player_id, team_id, minutes, points,
-    fg2_made, fg2_attempted, fg3_made, fg3_attempted,
-    ft_made, ft_attempted,
-    reb_def, reb_off, reb_total,
-    assists, steals, turnovers,
-    blocks_made, valuation, plus_minus,
-    player:player_id (id, name, team:team_id (id, name)),
-    match:match_id (competition_id)
-  `).limit(5000)
-
-  if (teamId) q = q.eq('team_id', teamId)
-
-  const { data, error } = await q
-  if (error) throw error
+  // Paginación: PostgREST tiene max 1000 filas por petición en el tier free
+  const PAGE = 1000
+  let allData = []
+  let from = 0
+  while (true) {
+    let q = sb.from('player_stats').select(`
+      player_id, team_id, minutes, points,
+      fg2_made, fg2_attempted, fg3_made, fg3_attempted,
+      ft_made, ft_attempted,
+      reb_def, reb_off, reb_total,
+      assists, steals, turnovers,
+      blocks_made, valuation, plus_minus,
+      player:player_id (id, name, team:team_id (id, name)),
+      match:match_id (competition_id)
+    `).range(from, from + PAGE - 1)
+    if (teamId) q = q.eq('team_id', teamId)
+    const { data, error } = await q
+    if (error) throw error
+    allData = allData.concat(data)
+    if (data.length < PAGE) break
+    from += PAGE
+  }
 
   // Filtrar por competición si se especifica
   const rows = competitionId
-    ? data.filter(r => r.match?.competition_id === competitionId)
-    : data
+    ? allData.filter(r => r.match?.competition_id === competitionId)
+    : allData
 
   // Agregar por jugadora
   const byPlayer = {}
