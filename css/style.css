@@ -144,7 +144,7 @@ nav {
 }
 .stat-card .value { font-size: 1.75rem; font-weight: 700; line-height: 1; }
 .stat-card .sub      { font-size: .78rem; color: var(--text2); margin-top: .2rem; }
-.stat-card .rank-pos { font-size: .72rem; font-weight: 700; color: #d4a017; margin-top: .15rem; line-height: 1; }
+.rank-pos { font-size: .72rem; font-weight: 700; color: #d4a017; margin-top: .15rem; line-height: 1; }
 
 /* ── Two-column layout ──────────────────────────────── */
 .two-col {
