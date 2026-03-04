@@ -115,8 +115,9 @@ async function init() {
     ranks.perMin_pts = rankBy(p => p.perMin_pts)
     ranks.fg2_made   = rankBy(p => p.fg2_made)
     ranks.fg3_made   = rankBy(p => p.fg3_made)
-    ranks.ft_made    = rankBy(p => p.ft_made)
-    ranks.ft_pct     = rankBy(p => p.ft_attempted > 0 ? p.ft_made / p.ft_attempted : null)
+    ranks.ft_made     = rankBy(p => p.ft_made)
+    ranks.ft_attempted = rankBy(p => p.ft_attempted)
+    ranks.ft_pct      = rankBy(p => p.ft_attempted > 0 ? p.ft_made / p.ft_attempted : null)
   } catch (_) {}
 
   const lastJersey = stats[stats.length - 1]?.jersey_number || '—'
@@ -145,11 +146,12 @@ async function init() {
     <div class="panel" style="margin-bottom:1.25rem">
       <div class="panel-header"><h2>Anotación</h2></div>
       <div class="panel-body">
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem;text-align:center">
-          ${shootingCard('TC2', agg.fg2_made, null, ranks.fg2_made)}
-          ${shootingCard('TC3', agg.fg3_made, null, ranks.fg3_made)}
-          ${shootingCard('TL',  agg.ft_made,  null, ranks.ft_made)}
-          ${shootingCard('%TL', agg.ft_pct,   `${agg.ft_made}/${agg.ft_attempted}`, ranks.ft_pct)}
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:.5rem;text-align:center">
+          ${shootingCard('TC2', agg.fg2_made,      null, ranks.fg2_made)}
+          ${shootingCard('TC3', agg.fg3_made,      null, ranks.fg3_made)}
+          ${shootingCard('TL',  agg.ft_made,       null, ranks.ft_made)}
+          ${shootingCard('TLF', agg.ft_attempted,  null, ranks.ft_attempted)}
+          ${shootingCard('%TL', agg.ft_pct,        null, ranks.ft_pct)}
         </div>
       </div>
     </div>
