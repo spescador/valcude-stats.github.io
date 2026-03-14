@@ -82,7 +82,7 @@
 
 <script type="module">
 import { signIn, signOut, getSession, onAuthStateChange } from './js/auth.js'
-import { checkMatchExists, importMatch } from './js/db.js'
+import { checkMatchExists, importMatch, getCompetitions } from './js/db.js'
 import { parseWorkbook, parseFilename } from './js/parser.js'
 import { titleCase, fmt } from './js/utils.js'
 
@@ -92,8 +92,11 @@ const importSection = document.getElementById('importSection')
 const btnSignout    = document.getElementById('btn-signout')
 const loginError    = document.getElementById('loginError')
 
+let competitions = []
+
 async function checkAuth() {
   const session = await getSession()
+  if (session) competitions = await getCompetitions().catch(() => [])
   setAuthUI(!!session)
 }
 
@@ -178,16 +181,18 @@ async function processFiles(files) {
         continue
       }
 
-      // 5. Leer jornada (editable) y fecha del preview ANTES de reemplazar el HTML
-      const jornadaVal = item.querySelector('.input-jornada')?.value
-      const jornada    = jornadaVal ? Number(jornadaVal) : parsed.jornada
-      const matchDate  = item.querySelector('.input-date')?.value || null
+      // 5. Leer jornada, fecha y competición del preview ANTES de reemplazar el HTML
+      const jornadaVal    = item.querySelector('.input-jornada')?.value
+      const jornada       = jornadaVal ? Number(jornadaVal) : parsed.jornada
+      const matchDate     = item.querySelector('.input-date')?.value || null
+      const compSelVal    = item.querySelector('.input-competition')?.value
+      const overrideCompId = compSelVal ? Number(compSelVal) : null
 
       // 6. Importar — resetear item ANTES de setItemStatus (showPreview borró .queue-status)
       item.innerHTML = `<div class="file-name">📄 ${parsed.sourceFile}</div>
         <div class="queue-status"></div>`
       setItemStatus(item, 'loading', 'Importando…')
-      await importMatch(parsed, jornada, matchDate)
+      await importMatch(parsed, jornada, matchDate, overrideCompId)
       setItemStatus(item, 'ok', `✓ Importado correctamente`)
 
     } catch (e) {
@@ -233,6 +238,13 @@ function showPreview(item, parsed) {
       </div>
 
       <div class="preview-meta">
+        <div class="field" style="flex:2;min-width:200px">
+          <label>Competición</label>
+          <select class="input-competition" style="background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:.4rem .6rem;width:100%">
+            <option value="">Auto (del Excel): ${parsed.competition} ${parsed.season}</option>
+            ${competitions.map(c => `<option value="${c.id}">${c.name} ${c.season}</option>`).join('')}
+          </select>
+        </div>
         <div class="field">
           <label>Jornada</label>
           <input type="number" class="input-jornada" value="${j}" min="1" style="width:80px;background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:.4rem .6rem">

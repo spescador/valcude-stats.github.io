@@ -40,8 +40,11 @@
     <p id="subtitle">Cargando datos…</p>
   </div>
 
-  <!-- Filtro de equipo -->
+  <!-- Filtros -->
   <div class="filters">
+    <select id="compFilter">
+      <option value="">Todas las competiciones</option>
+    </select>
     <select id="teamFilter">
       <option value="">Todos los equipos</option>
     </select>
@@ -95,7 +98,7 @@
 </div>
 
 <script type="module">
-import { getMatches, getLeaderboard, getTeams } from './js/db.js'
+import { getMatches, getLeaderboard, getTeams, getCompetitions } from './js/db.js'
 import { updateNavAuth } from './js/auth.js'
 import { fmt, titleCase } from './js/utils.js'
 import { requirePin } from './js/pin.js'
@@ -103,16 +106,18 @@ import { requirePin } from './js/pin.js'
 requirePin()
 updateNavAuth()
 
-let allMatches    = []
-let leaderboard   = []
-let allTeams      = []
-let selectedTeamId = null
-let currentStat    = 'avg_pts'
-let currentDec     = 1
+let allMatches     = []
+let leaderboard    = []
+let allTeams       = []
+let selectedTeamId  = null
+let selectedCompId  = null
+let currentStat     = 'avg_pts'
+let currentDec      = 1
 
 async function init() {
-  const [teams, matches, leaders] = await Promise.all([
+  const [teams, comps, matches, leaders] = await Promise.all([
     getTeams(),
+    getCompetitions(),
     getMatches(),
     getLeaderboard(),
   ])
@@ -121,19 +126,28 @@ async function init() {
   allMatches  = matches
   leaderboard = leaders
 
+  // Selector de competición
+  const compSel = document.getElementById('compFilter')
+  for (const c of comps) {
+    const opt = document.createElement('option')
+    opt.value = c.id
+    opt.textContent = `${c.name} ${c.season}`
+    compSel.appendChild(opt)
+  }
+
   // Selector de equipo
-  const sel = document.getElementById('teamFilter')
+  const teamSel = document.getElementById('teamFilter')
   for (const t of teams) {
     const opt = document.createElement('option')
     opt.value = t.id
     opt.textContent = titleCase(t.name)
-    sel.appendChild(opt)
+    teamSel.appendChild(opt)
   }
 
   // Default: primer Valcude encontrado
   const valcude = teams.find(t => t.name === 'VALCUDE ALCOBENDAS')
   if (valcude) {
-    sel.value = valcude.id
+    teamSel.value = valcude.id
     selectedTeamId = valcude.id
   }
 
@@ -142,15 +156,19 @@ async function init() {
 
 /* ── Filtros ─────────────────────────────────────────── */
 function filteredMatches() {
-  if (!selectedTeamId) return allMatches
-  return allMatches.filter(m =>
+  let ms = allMatches
+  if (selectedCompId) ms = ms.filter(m => m.competition?.id === selectedCompId)
+  if (selectedTeamId) ms = ms.filter(m =>
     m.team1?.id === selectedTeamId || m.team2?.id === selectedTeamId
   )
+  return ms
 }
 
 function filteredLeaderboard() {
-  if (!selectedTeamId) return leaderboard
-  return leaderboard.filter(p => p.player?.team?.id === selectedTeamId)
+  // El leaderboard ya viene filtrado por competición desde la carga
+  let lb = leaderboard
+  if (selectedTeamId) lb = lb.filter(p => p.player?.team?.id === selectedTeamId)
+  return lb
 }
 
 /* ── Render ──────────────────────────────────────────── */
@@ -253,6 +271,17 @@ document.getElementById('leaderTabs').addEventListener('click', e => {
   currentStat = btn.dataset.stat
   currentDec  = Number(btn.dataset.dec) || 1
   renderLeader(filteredLeaderboard())
+})
+
+document.getElementById('compFilter').addEventListener('change', async e => {
+  selectedCompId = e.target.value ? Number(e.target.value) : null
+  const [matches, leaders] = await Promise.all([
+    getMatches({ competitionId: selectedCompId }),
+    getLeaderboard({ competitionId: selectedCompId }),
+  ])
+  allMatches  = matches
+  leaderboard = leaders
+  render()
 })
 
 document.getElementById('teamFilter').addEventListener('change', e => {

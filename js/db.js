@@ -188,10 +188,10 @@ export async function checkMatchExists(sourceFile) {
 }
 
 /** Importa un partido completo (equipos, jugadoras, stats) */
-export async function importMatch(parsed, jornada, matchDate) {
+export async function importMatch(parsed, jornada, matchDate, overrideCompetitionId = null) {
   const sb = getClient()
 
-  const compId = await upsertCompetition(
+  const compId = overrideCompetitionId ?? await upsertCompetition(
     parsed.competition, parsed.season, 'FBM'
   )
   const team1Id = await upsertTeam(parsed.team1.name)
